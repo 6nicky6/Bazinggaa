@@ -9,11 +9,10 @@ import PressableScale from '../components/PressableScale';
 import { colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
 
-// Login UI only this sprint — real phone OTP / email auth arrives in Sprint 2.
-// Both buttons preview the chat list so the whole flow is walkable.
-type Props = { onContinue: () => void };
-
-export default function LoginScreen({ onContinue }: Props) {
+// Entry point of the auth flow: phone (primary) or email (fallback) —
+// both lead into the verification flow. Demo mode verifies instantly.
+export default function LoginScreen({ navigation }: any) {
+  const onContinue = () => navigation.navigate('Phone');
   return (
     <View style={styles.container}>
       <GlowBackground />

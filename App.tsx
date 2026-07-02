@@ -12,19 +12,19 @@ import {
   SpaceGrotesk_500Medium,
   SpaceGrotesk_700Bold,
 } from '@expo-google-fonts/space-grotesk';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
-import LoginScreen from './src/screens/LoginScreen';
-import ChatListScreen from './src/screens/ChatListScreen';
+import RootNavigator from './src/navigation';
+import { useAppStore } from './src/store/appStore';
 import { colors } from './src/theme/colors';
 
-// Flow: Splash → Onboarding → Login → Chat list preview.
-// Simple state routing this sprint; real auth routing lands in Sprint 2.
-type Screen = 'splash' | 'onboarding' | 'login' | 'chats';
-
+// Flow: Splash → (first launch only) Onboarding → Auth or Main app.
 export default function App() {
-  const [screen, setScreen] = useState<Screen>('splash');
+  const [splashDone, setSplashDone] = useState(false);
+  const hydrated = useAppStore((s) => s.hydrated);
+  const onboarded = useAppStore((s) => s.onboarded);
+  const setOnboarded = useAppStore((s) => s.setOnboarded);
+
   const [fontsLoaded] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -35,30 +35,31 @@ export default function App() {
   });
 
   if (!fontsLoaded) {
-    // brand-black frame while fonts load (a beat, then splash takes over)
     return <View style={{ flex: 1, backgroundColor: colors.black }} />;
+  }
+
+  if (!splashDone || !hydrated) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.black }}>
+        <StatusBar style="light" />
+        <SplashScreen onDone={() => setSplashDone(true)} />
+      </View>
+    );
+  }
+
+  if (!onboarded) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.black }}>
+        <StatusBar style="light" />
+        <OnboardingScreen onDone={setOnboarded} />
+      </View>
+    );
   }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.black }}>
       <StatusBar style="light" />
-      <Animated.View
-        key={screen}
-        style={{ flex: 1 }}
-        entering={FadeIn.duration(400)}
-        exiting={FadeOut.duration(250)}
-      >
-        {screen === 'splash' && (
-          <SplashScreen onDone={() => setScreen('onboarding')} />
-        )}
-        {screen === 'onboarding' && (
-          <OnboardingScreen onDone={() => setScreen('login')} />
-        )}
-        {screen === 'login' && (
-          <LoginScreen onContinue={() => setScreen('chats')} />
-        )}
-        {screen === 'chats' && <ChatListScreen />}
-      </Animated.View>
+      <RootNavigator />
     </View>
   );
 }

@@ -4,12 +4,17 @@
 
 ## Status Snapshot
 - **Phase:** 1 — BUILD
-- **Sprint:** 1 + 1.5 done (UI + premium design pass); testing via WEB browser for now
-- **Next action:** Sprint 2 (Supabase auth) OR resume phone debugging (below)
+- **Sprint:** FULL APP built (overnight 2 Jul) — every screen + working functionality in demo mode; browser-tested end to end
+- **Next action:** Nikhil reviews in browser → then plug in Supabase + Gemini keys (.env) to go live → resume phone debugging (below)
 - **Blocker (parked 2 Jul):** Expo Go on Nikhil's S25 Ultra won't load the app — endless white spinner. Ruled out: firewall (rule added, admin), network category (set Private), manifest/server (healthy, phone browser CAN reach http://192.168.1.44:8081/status), URL typos (QR scan tried). Prime remaining suspects: Expo Go SDK version mismatch vs SDK 57 (check Expo Go version number first!), corporate endpoint protection on the laptop, router client isolation. Workaround if unsolved: USB + adb reverse, or EAS dev build.
 - **Note:** Building on Nikhil's Windows 11 laptop (not Mac — setup guide's Homebrew steps skipped). Personal accounts only, never company resources. GitHub: https://github.com/6nicky6/Bazinggaa.git (identity 6nicky6, never work email).
 
 ---
+
+### 2026-07-02 — FULL APP (overnight build after Nikhil's feedback)
+- Did: Complete app — auth flow (phone → OTP → profile setup with avatar picker), react-navigation shell (frosted tab bar), full 1:1 chat (bubbles, ticks progressing sent→delivered→read, date separators, typing indicator, contacts that auto-reply with personality), AI Smart Replies (Gemini-ready, mock provider until key added), Moments (feed + gradient composer + full-screen story viewer with progress bars + view counts + delete), Discover, Calls log, Profile/Settings (edit profile, AI toggle, blocked-users manager, notifications, logout), block/report, zustand store persisted to AsyncStorage. Demo mode = fully working offline; .env keys flip it to Supabase/Gemini live.
+- Broke: Nothing — tsc clean, browser-tested the whole flow (signup → chat → auto-reply → smart replies → moments).
+- Next: Nikhil review; create personal Supabase project + Gemini key; wire live auth/realtime (SupabaseBackend); phone debugging (Expo Go version check).
 
 ### 2026-07-02 — Sprint 1.5 (WOW design pass)
 - Did: Premium overhaul — animated splash (logo spring + wordmark), word-level onboarding reveal + progress dots, gradient/glass login, chat list with Moments story rings, gradient avatars, typing indicator, FAB, frosted-glass bottom nav; Space Grotesk + Inter fonts, haptics, reanimated micro-interactions, ambient glow orbs on all screens.
