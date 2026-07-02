@@ -1,48 +1,70 @@
 import React from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import Logo from '../components/Logo';
-import { colors } from '../theme/colors';
+import GlowBackground from '../components/GlowBackground';
+import PressableScale from '../components/PressableScale';
+import { colors, gradients } from '../theme/colors';
+import { fonts } from '../theme/typography';
 
 // Login UI only this sprint — real phone OTP / email auth arrives in Sprint 2.
-// For now both buttons preview the chat list so the whole flow is walkable.
+// Both buttons preview the chat list so the whole flow is walkable.
 type Props = { onContinue: () => void };
 
 export default function LoginScreen({ onContinue }: Props) {
   return (
     <View style={styles.container}>
+      <GlowBackground />
+
       <View style={styles.center}>
-        <Logo size={112} />
-        <Text style={styles.appName}>Bazingga</Text>
-        <Text style={styles.tagline}>Fast. Private. Expressive.</Text>
+        <Animated.View entering={FadeInDown.duration(600).springify()}>
+          <Logo size={116} />
+        </Animated.View>
+        <Animated.Text
+          entering={FadeInDown.delay(120).duration(600).springify()}
+          style={styles.appName}
+        >
+          Bazingga
+        </Animated.Text>
+        <Animated.Text
+          entering={FadeInDown.delay(240).duration(600)}
+          style={styles.tagline}
+        >
+          Fast. Private. Expressive.
+        </Animated.Text>
       </View>
 
       <View style={styles.actions}>
-        <Pressable
-          style={({ pressed }) => [styles.phoneButton, pressed && styles.pressed]}
-          onPress={onContinue}
-        >
-          <Ionicons name="call" size={18} color={colors.black} />
-          <Text style={styles.phoneButtonText}>Continue with Phone</Text>
-        </Pressable>
+        <Animated.View entering={FadeInUp.delay(350).duration(550).springify()}>
+          <PressableScale onPress={onContinue} style={styles.buttonShadow}>
+            <LinearGradient
+              colors={gradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryButton}
+            >
+              <Ionicons name="call" size={18} color={colors.white} />
+              <Text style={styles.primaryButtonText}>Continue with Phone</Text>
+            </LinearGradient>
+          </PressableScale>
+        </Animated.View>
 
-        <Pressable
-          style={({ pressed }) => [styles.emailButton, pressed && styles.pressed]}
-          onPress={onContinue}
-        >
-          <Ionicons name="mail" size={18} color={colors.white} />
-          <Text style={styles.emailButtonText}>Continue with Email</Text>
-        </Pressable>
+        <Animated.View entering={FadeInUp.delay(470).duration(550).springify()}>
+          <PressableScale onPress={onContinue} style={styles.glassButton}>
+            <Ionicons name="mail" size={18} color={colors.white} />
+            <Text style={styles.glassButtonText}>Continue with Email</Text>
+          </PressableScale>
+        </Animated.View>
 
-        <Text style={styles.terms}>
+        <Animated.Text
+          entering={FadeInUp.delay(600).duration(500)}
+          style={styles.terms}
+        >
           By continuing you agree to our Terms of Service{'\n'}and Privacy
           Policy.
-        </Text>
+        </Animated.Text>
       </View>
     </View>
   );
@@ -53,9 +75,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.black,
     justifyContent: 'space-between',
-    paddingHorizontal: 28,
+    paddingHorizontal: 26,
     paddingTop: 40,
-    paddingBottom: 36,
+    paddingBottom: 40,
   },
   center: {
     flex: 1,
@@ -64,57 +86,63 @@ const styles = StyleSheet.create({
   },
   appName: {
     color: colors.white,
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginTop: 24,
+    fontSize: 40,
+    fontFamily: fonts.display,
+    marginTop: 28,
   },
   tagline: {
     color: colors.textSecondary,
     fontSize: 15,
-    letterSpacing: 2,
+    fontFamily: fonts.medium,
+    letterSpacing: 2.5,
     marginTop: 10,
   },
   actions: {
     gap: 14,
   },
-  phoneButton: {
+  buttonShadow: {
+    borderRadius: 30,
+    shadowColor: colors.red,
+    shadowOpacity: 0.55,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 12,
+  },
+  primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: colors.white,
-    borderRadius: 28,
-    paddingVertical: 16,
+    borderRadius: 30,
+    paddingVertical: 17,
   },
-  phoneButtonText: {
-    color: colors.black,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  emailButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 28,
-    paddingVertical: 16,
-  },
-  emailButtonText: {
+  primaryButtonText: {
     color: colors.white,
     fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
-  pressed: {
-    opacity: 0.75,
+  glassButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: colors.glass,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 30,
+    paddingVertical: 17,
+  },
+  glassButtonText: {
+    color: colors.white,
+    fontSize: 16,
+    fontFamily: fonts.semiBold,
   },
   terms: {
     color: colors.textTertiary,
     fontSize: 12,
+    fontFamily: fonts.regular,
     textAlign: 'center',
     lineHeight: 18,
-    marginTop: 8,
+    marginTop: 6,
   },
 });

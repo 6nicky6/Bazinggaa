@@ -1,4 +1,6 @@
 // Dummy data for Sprint 1 UI. Replaced by real Supabase data in Sprint 3.
+import { gradients } from '../theme/colors';
+
 export type ChatFilter = 'All' | 'Friends' | 'Family' | 'Work';
 
 export type DummyChat = {
@@ -7,9 +9,11 @@ export type DummyChat = {
   preview: string;
   time: string;
   unread: number;
-  avatarColor: string;
+  gradient: readonly [string, string];
   initials: string;
   group: Exclude<ChatFilter, 'All'>;
+  online?: boolean;
+  typing?: boolean;
 };
 
 export const FILTERS: ChatFilter[] = ['All', 'Friends', 'Family', 'Work'];
@@ -21,9 +25,11 @@ export const DUMMY_CHATS: DummyChat[] = [
     preview: 'Did you see the game last night?? 🔥',
     time: '7:42 PM',
     unread: 3,
-    avatarColor: '#7C3AED',
+    gradient: gradients.avatar1,
     initials: 'A',
     group: 'Friends',
+    online: true,
+    typing: true,
   },
   {
     id: '2',
@@ -31,9 +37,10 @@ export const DUMMY_CHATS: DummyChat[] = [
     preview: 'Call me when you are free beta',
     time: '6:15 PM',
     unread: 1,
-    avatarColor: '#0891B2',
+    gradient: gradients.avatar2,
     initials: 'M',
     group: 'Family',
+    online: true,
   },
   {
     id: '3',
@@ -41,7 +48,7 @@ export const DUMMY_CHATS: DummyChat[] = [
     preview: 'Sent the deck, review before standup',
     time: '4:03 PM',
     unread: 0,
-    avatarColor: '#16A34A',
+    gradient: gradients.avatar3,
     initials: 'R',
     group: 'Work',
   },
@@ -51,9 +58,10 @@ export const DUMMY_CHATS: DummyChat[] = [
     preview: 'hahaha that meme is exactly you',
     time: 'Yesterday',
     unread: 5,
-    avatarColor: '#DB2777',
+    gradient: gradients.avatar4,
     initials: 'Z',
     group: 'Friends',
+    online: true,
   },
   {
     id: '5',
@@ -61,8 +69,17 @@ export const DUMMY_CHATS: DummyChat[] = [
     preview: 'Good morning 🌞',
     time: 'Yesterday',
     unread: 0,
-    avatarColor: '#EA580C',
+    gradient: gradients.avatar5,
     initials: 'D',
     group: 'Family',
   },
+];
+
+// Moments teaser row (feature ships in Sprint 5 — UI preview only)
+export const DUMMY_MOMENTS = [
+  { id: 'me', name: 'You', initials: '+', isMe: true, gradient: gradients.primary },
+  { id: 'm1', name: 'Aisha', initials: 'A', gradient: gradients.avatar1 },
+  { id: 'm2', name: 'Zara', initials: 'Z', gradient: gradients.avatar4 },
+  { id: 'm3', name: 'Mom', initials: 'M', gradient: gradients.avatar2 },
+  { id: 'm4', name: 'Rahul', initials: 'R', gradient: gradients.avatar3 },
 ];

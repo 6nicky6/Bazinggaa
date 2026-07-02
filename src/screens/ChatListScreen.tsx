@@ -1,17 +1,35 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme/colors';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
+import Animated, {
+  Easing,
+  FadeInDown,
+  FadeInRight,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import GlowBackground from '../components/GlowBackground';
+import PressableScale from '../components/PressableScale';
+import { colors, gradients } from '../theme/colors';
+import { fonts } from '../theme/typography';
 import {
   ChatFilter,
   DUMMY_CHATS,
+  DUMMY_MOMENTS,
   DummyChat,
   FILTERS,
 } from '../data/dummyChats';
@@ -40,50 +58,149 @@ export default function ChatListScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Chats</Text>
-        <Ionicons name="flash" size={22} color={colors.yellow} />
-      </View>
+      <GlowBackground />
 
-      <View style={styles.searchBox}>
-        <Ionicons name="search" size={17} color={colors.textTertiary} />
+      {/* Header */}
+      <Animated.View entering={FadeInDown.duration(500)} style={styles.header}>
+        <Text style={styles.title}>Chats</Text>
+        <View style={styles.headerIcons}>
+          <PressableScale style={styles.iconButton} haptic={false}>
+            <Ionicons name="scan" size={19} color={colors.textSecondary} />
+          </PressableScale>
+          <PressableScale style={styles.iconButton} haptic={false}>
+            <Ionicons
+              name="ellipsis-horizontal"
+              size={19}
+              color={colors.textSecondary}
+            />
+          </PressableScale>
+        </View>
+      </Animated.View>
+
+      {/* Moments ring row */}
+      <Animated.View entering={FadeInDown.delay(80).duration(500)}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.momentsRow}
+        >
+          {DUMMY_MOMENTS.map((m, i) => (
+            <Animated.View
+              key={m.id}
+              entering={FadeInRight.delay(120 + i * 70).springify()}
+            >
+              <PressableScale style={styles.momentItem} haptic={false}>
+                <LinearGradient
+                  colors={
+                    m.isMe
+                      ? ([colors.border, colors.border] as const)
+                      : gradients.momentRing
+                  }
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.momentRing}
+                >
+                  <View style={styles.momentInner}>
+                    <LinearGradient
+                      colors={m.gradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.momentAvatar}
+                    >
+                      <Text
+                        style={[
+                          styles.momentInitials,
+                          m.isMe && { fontSize: 24, marginTop: -2 },
+                        ]}
+                      >
+                        {m.initials}
+                      </Text>
+                    </LinearGradient>
+                  </View>
+                </LinearGradient>
+                <Text style={styles.momentName}>{m.name}</Text>
+              </PressableScale>
+            </Animated.View>
+          ))}
+        </ScrollView>
+      </Animated.View>
+
+      {/* Search */}
+      <Animated.View
+        entering={FadeInDown.delay(160).duration(500)}
+        style={styles.searchBox}
+      >
+        <Ionicons name="search" size={16} color={colors.textTertiary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search"
+          placeholder="Search conversations"
           placeholderTextColor={colors.textTertiary}
           value={search}
           onChangeText={setSearch}
         />
-      </View>
+      </Animated.View>
 
-      <View style={styles.filterRow}>
+      {/* Filter pills */}
+      <Animated.View
+        entering={FadeInDown.delay(220).duration(500)}
+        style={styles.filterRow}
+      >
         {FILTERS.map((f) => {
           const active = f === filter;
           return (
-            <Pressable
+            <PressableScale
               key={f}
               onPress={() => setFilter(f)}
-              style={[styles.filterPill, active && styles.filterPillActive]}
+              style={styles.filterPillWrap}
+              scaleTo={0.92}
             >
-              <Text
-                style={[styles.filterText, active && styles.filterTextActive]}
-              >
-                {f}
-              </Text>
-            </Pressable>
+              {active ? (
+                <LinearGradient
+                  colors={gradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.filterPill}
+                >
+                  <Text style={styles.filterTextActive}>{f}</Text>
+                </LinearGradient>
+              ) : (
+                <View style={[styles.filterPill, styles.filterPillIdle]}>
+                  <Text style={styles.filterText}>{f}</Text>
+                </View>
+              )}
+            </PressableScale>
           );
         })}
-      </View>
+      </Animated.View>
 
+      {/* Chat rows */}
       <FlatList
         data={chats}
         keyExtractor={(c) => c.id}
-        renderItem={({ item }) => <ChatRow chat={item} />}
-        contentContainerStyle={{ paddingBottom: 12 }}
+        renderItem={({ item, index }) => <ChatRow chat={item} index={index} />}
+        contentContainerStyle={{ paddingBottom: 130 }}
         showsVerticalScrollIndicator={false}
       />
 
-      <View style={styles.bottomNav}>
+      {/* Floating new-chat button */}
+      <Animated.View
+        entering={FadeInDown.delay(500).springify()}
+        style={styles.fabWrap}
+      >
+        <PressableScale scaleTo={0.9}>
+          <LinearGradient
+            colors={gradients.primary}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.fab}
+          >
+            <Ionicons name="chatbubble-ellipses" size={24} color={colors.white} />
+          </LinearGradient>
+        </PressableScale>
+      </Animated.View>
+
+      {/* Frosted bottom nav */}
+      <BlurView intensity={40} tint="dark" style={styles.bottomNav}>
         {NAV_TABS.map((tab, i) => {
           const active = i === 0; // Chats active this sprint
           return (
@@ -96,49 +213,115 @@ export default function ChatListScreen() {
               <Text
                 style={[
                   styles.navLabel,
-                  active && { color: colors.red, fontWeight: '700' },
+                  active && {
+                    color: colors.red,
+                    fontFamily: fonts.semiBold,
+                  },
                 ]}
               >
                 {tab.key}
               </Text>
+              {active && <View style={styles.navDot} />}
             </View>
           );
         })}
-      </View>
+      </BlurView>
     </View>
   );
 }
 
-function ChatRow({ chat }: { chat: DummyChat }) {
+function ChatRow({ chat, index }: { chat: DummyChat; index: number }) {
   return (
-    <Pressable style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}>
-      <View style={[styles.avatar, { backgroundColor: chat.avatarColor }]}>
-        <Text style={styles.avatarText}>{chat.initials}</Text>
-      </View>
-      <View style={styles.rowBody}>
-        <View style={styles.rowTop}>
-          <Text style={styles.chatName}>{chat.name}</Text>
-          <Text
-            style={[
-              styles.chatTime,
-              chat.unread > 0 && { color: colors.yellow },
-            ]}
+    <Animated.View
+      entering={FadeInDown.delay(280 + index * 70)
+        .duration(500)
+        .springify()
+        .damping(16)}
+    >
+      <PressableScale style={styles.row} scaleTo={0.98} haptic={false}>
+        <View>
+          <LinearGradient
+            colors={chat.gradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatar}
           >
-            {chat.time}
-          </Text>
+            <Text style={styles.avatarText}>{chat.initials}</Text>
+          </LinearGradient>
+          {chat.online && <View style={styles.onlineDot} />}
         </View>
-        <View style={styles.rowBottom}>
-          <Text style={styles.preview} numberOfLines={1}>
-            {chat.preview}
-          </Text>
-          {chat.unread > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{chat.unread}</Text>
-            </View>
-          )}
+        <View style={styles.rowBody}>
+          <View style={styles.rowTop}>
+            <Text style={styles.chatName}>{chat.name}</Text>
+            <Text
+              style={[
+                styles.chatTime,
+                chat.unread > 0 && { color: colors.yellow },
+              ]}
+            >
+              {chat.time}
+            </Text>
+          </View>
+          <View style={styles.rowBottom}>
+            {chat.typing ? (
+              <TypingIndicator />
+            ) : (
+              <Text style={styles.preview} numberOfLines={1}>
+                {chat.preview}
+              </Text>
+            )}
+            {chat.unread > 0 && <UnreadBadge count={chat.unread} />}
+          </View>
         </View>
-      </View>
-    </Pressable>
+      </PressableScale>
+    </Animated.View>
+  );
+}
+
+function TypingIndicator() {
+  return (
+    <View style={styles.typingRow}>
+      <Text style={styles.typingText}>typing</Text>
+      {[0, 1, 2].map((i) => (
+        <TypingDot key={i} index={i} />
+      ))}
+    </View>
+  );
+}
+
+function TypingDot({ index }: { index: number }) {
+  const y = useSharedValue(0);
+  useEffect(() => {
+    y.value = withDelay(
+      index * 140,
+      withRepeat(
+        withSequence(
+          withTiming(-3, { duration: 280, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 280, easing: Easing.inOut(Easing.quad) }),
+          withTiming(0, { duration: 280 })
+        ),
+        -1
+      )
+    );
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ translateY: y.value }],
+  }));
+  return <Animated.View style={[styles.typingDot, style]} />;
+}
+
+function UnreadBadge({ count }: { count: number }) {
+  const scale = useSharedValue(0);
+  useEffect(() => {
+    scale.value = withDelay(600, withSpring(1, { damping: 10, stiffness: 200 }));
+  }, []);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+  return (
+    <Animated.View style={[styles.badge, style]}>
+      <Text style={styles.badgeText}>{count}</Text>
+    </Animated.View>
   );
 }
 
@@ -146,84 +329,158 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.black,
-    paddingTop: 56,
+    paddingTop: 58,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 14,
+    marginBottom: 16,
   },
   title: {
     color: colors.white,
-    fontSize: 30,
-    fontWeight: '800',
+    fontSize: 32,
+    fontFamily: fonts.display,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  iconButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.glass,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  momentsRow: {
+    paddingHorizontal: 20,
+    gap: 14,
+    paddingBottom: 18,
+  },
+  momentItem: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  momentRing: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  momentInner: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: colors.black,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  momentAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  momentInitials: {
+    color: colors.white,
+    fontSize: 20,
+    fontFamily: fonts.bold,
+  },
+  momentName: {
+    color: colors.textSecondary,
+    fontSize: 11.5,
+    fontFamily: fonts.medium,
   },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: colors.surface,
-    borderRadius: 22,
-    paddingHorizontal: 14,
-    paddingVertical: 2,
+    backgroundColor: colors.glass,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: 24,
+    paddingHorizontal: 15,
     marginHorizontal: 20,
     marginBottom: 14,
   },
   searchInput: {
     flex: 1,
     color: colors.white,
-    fontSize: 15,
-    paddingVertical: 9,
+    fontSize: 14.5,
+    fontFamily: fonts.regular,
+    paddingVertical: 11,
   },
   filterRow: {
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 20,
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  filterPillWrap: {
+    borderRadius: 20,
   },
   filterPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 7,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
+    paddingHorizontal: 17,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
-  filterPillActive: {
-    backgroundColor: colors.red,
+  filterPillIdle: {
+    backgroundColor: colors.glass,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
   },
   filterText: {
     color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.semiBold,
   },
   filterTextActive: {
     color: colors.white,
+    fontSize: 13,
+    fontFamily: fonts.semiBold,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 11,
   },
   avatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     color: colors.white,
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
+  },
+  onlineDot: {
+    position: 'absolute',
+    right: 0,
+    bottom: 2,
+    width: 13,
+    height: 13,
+    borderRadius: 7,
+    backgroundColor: colors.online,
+    borderWidth: 2.5,
+    borderColor: colors.black,
   },
   rowBody: {
     flex: 1,
     marginLeft: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
-    paddingBottom: 12,
+    paddingBottom: 11,
   },
   rowTop: {
     flexDirection: 'row',
@@ -233,11 +490,12 @@ const styles = StyleSheet.create({
   chatName: {
     color: colors.white,
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: fonts.semiBold,
   },
   chatTime: {
     color: colors.textTertiary,
     fontSize: 12,
+    fontFamily: fonts.regular,
   },
   rowBottom: {
     flexDirection: 'row',
@@ -248,12 +506,30 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.textSecondary,
     fontSize: 14,
+    fontFamily: fonts.regular,
     marginRight: 10,
   },
+  typingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  typingText: {
+    color: colors.yellow,
+    fontSize: 14,
+    fontFamily: fonts.medium,
+    marginRight: 3,
+  },
+  typingDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.yellow,
+  },
   badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
+    minWidth: 21,
+    height: 21,
+    borderRadius: 11,
     backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
@@ -262,23 +538,54 @@ const styles = StyleSheet.create({
   badgeText: {
     color: colors.white,
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: fonts.bold,
+  },
+  fabWrap: {
+    position: 'absolute',
+    right: 20,
+    bottom: 104,
+    borderRadius: 30,
+    shadowColor: colors.red,
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 14,
+  },
+  fab: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bottomNav: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: 'row',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    backgroundColor: colors.black,
-    paddingTop: 8,
-    paddingBottom: 20,
+    borderTopColor: colors.glassBorder,
+    paddingTop: 10,
+    paddingBottom: 24,
+    backgroundColor: 'rgba(11,11,11,0.72)',
+    overflow: 'hidden',
   },
   navItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
+    gap: 3,
   },
   navLabel: {
     color: colors.textTertiary,
     fontSize: 10.5,
+    fontFamily: fonts.medium,
+  },
+  navDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.red,
+    marginTop: 1,
   },
 });

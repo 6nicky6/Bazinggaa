@@ -1,35 +1,51 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { StyleSheet, View, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme/colors';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, gradients } from '../theme/colors';
 
-// Placeholder logo: yellow lightning bolt in a red chat bubble.
-// The real logo file replaces this — drop it at assets/logo.png and ask
-// Claude Code to wire it in (do NOT regenerate the logo).
-type Props = { size?: number; style?: ViewStyle };
+// Placeholder logo: yellow lightning bolt in a red gradient chat bubble
+// with a soft glow. The real logo file replaces this — drop it at
+// assets/logo.png and ask Claude Code to wire it in (do NOT regenerate).
+type Props = { size?: number; style?: ViewStyle; glow?: boolean };
 
-export default function Logo({ size = 96, style }: Props) {
+export default function Logo({ size = 96, style, glow = true }: Props) {
   return (
-    <View
-      style={[
-        styles.bubble,
-        {
+    <View style={[{ alignItems: 'center', justifyContent: 'center' }, style]}>
+      {glow && (
+        <View
+          style={[
+            styles.glow,
+            {
+              width: size * 1.55,
+              height: size * 1.55,
+              borderRadius: (size * 1.55) / 2,
+            },
+          ]}
+        />
+      )}
+      <LinearGradient
+        colors={gradients.primary}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
           width: size,
           height: size,
-          borderRadius: size * 0.32,
-        },
-        style,
-      ]}
-    >
-      <Ionicons name="flash" size={size * 0.5} color={colors.yellow} />
+          borderRadius: size * 0.3,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name="flash" size={size * 0.52} color={colors.yellow} />
+      </LinearGradient>
       <View
         style={[
           styles.tail,
           {
-            bottom: -size * 0.08,
-            left: size * 0.18,
-            borderTopWidth: size * 0.14,
-            borderRightWidth: size * 0.14,
+            bottom: -size * 0.07,
+            left: size * 0.42,
+            borderTopWidth: size * 0.13,
+            borderRightWidth: size * 0.13,
           },
         ]}
       />
@@ -38,16 +54,23 @@ export default function Logo({ size = 96, style }: Props) {
 }
 
 const styles = StyleSheet.create({
-  bubble: {
+  glow: {
+    position: 'absolute',
     backgroundColor: colors.red,
-    alignItems: 'center',
-    justifyContent: 'center',
+    opacity: 0.28,
+    // big soft shadow ring on Android/iOS
+    shadowColor: colors.red,
+    shadowOpacity: 0.9,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 24,
+    transform: [{ scale: 0.72 }],
   },
   tail: {
     position: 'absolute',
     width: 0,
     height: 0,
-    borderTopColor: colors.red,
+    borderTopColor: colors.redHot,
     borderRightColor: 'transparent',
   },
 });
