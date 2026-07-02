@@ -1,8 +1,9 @@
 {
-  "name": "bazingga-scaffold",
-  "version": "1.0.0",
+  "name": "bazingga",
+  "version": "0.1.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
     "expo": "~57.0.1",
     "expo-status-bar": "~57.0.0",
     "react": "19.2.3",
