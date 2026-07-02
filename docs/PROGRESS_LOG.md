@@ -4,10 +4,10 @@
 
 ## Status Snapshot
 - **Phase:** 1 — BUILD
-- **Sprint:** 1 (UI on phone) — code done, awaiting Nikhil's phone test
-- **Next action:** Open app in Expo Go on Nikhil's Android phone; then Sprint 2 (Supabase auth)
-- **Blocker:** None
-- **Note:** Building on Nikhil's Windows 11 laptop (not Mac — setup guide's Homebrew steps skipped). Personal accounts only, never company resources.
+- **Sprint:** 1 + 1.5 done (UI + premium design pass); testing via WEB browser for now
+- **Next action:** Sprint 2 (Supabase auth) OR resume phone debugging (below)
+- **Blocker (parked 2 Jul):** Expo Go on Nikhil's S25 Ultra won't load the app — endless white spinner. Ruled out: firewall (rule added, admin), network category (set Private), manifest/server (healthy, phone browser CAN reach http://192.168.1.44:8081/status), URL typos (QR scan tried). Prime remaining suspects: Expo Go SDK version mismatch vs SDK 57 (check Expo Go version number first!), corporate endpoint protection on the laptop, router client isolation. Workaround if unsolved: USB + adb reverse, or EAS dev build.
+- **Note:** Building on Nikhil's Windows 11 laptop (not Mac — setup guide's Homebrew steps skipped). Personal accounts only, never company resources. GitHub: https://github.com/6nicky6/Bazinggaa.git (identity 6nicky6, never work email).
 
 ---
 
