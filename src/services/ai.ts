@@ -22,17 +22,25 @@ class GeminiProvider implements SmartReplyProvider {
     lastCall = Date.now();
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-goog-api-key': GEMINI_KEY as string,
+          },
           body: JSON.stringify({
             contents: [{
               parts: [{
                 text: `You suggest 3 short casual chat replies (max 6 words each, match the language and vibe, emojis ok) to this message from ${contactName}: "${lastMessage}". Reply ONLY with the 3 options separated by | no numbering.`,
               }],
             }],
-            generationConfig: { maxOutputTokens: 60, temperature: 0.9 },
+            generationConfig: {
+              maxOutputTokens: 100,
+              temperature: 0.9,
+              // flash "thinking" burns the budget before any text — turn it off
+              thinkingConfig: { thinkingBudget: 0 },
+            },
           }),
         }
       );
