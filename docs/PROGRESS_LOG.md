@@ -5,7 +5,8 @@
 ## Status Snapshot
 - **Phase:** 1 — BUILD
 - **Sprint:** FULL APP built (overnight 2 Jul) — every screen + working functionality in demo mode; browser-tested end to end
-- **Next action:** Nikhil does docs/GO_LIVE.md (10 min, from office) → paste 3 keys → live mode ON → resume phone debugging (below)
+- **Next action:** Nikhil clicks "Create API key" in AI Studio (Google blocks automated key creation) → Claude adds it to .env → first real two-device chat test → resume phone debugging (below)
+- **LIVE MODE ON (3 Jul):** Supabase project "Bazinggaa" (xnddlmiiargjnekizoew, ap-southeast-1) restored + schema v2 with RLS applied via browser automation; OTP email template fixed to include {{ .Token }}; .env created (gitignored); app verified running live. Gemini key pending Nikhil's one click (GCP project "bazingga" created + imported into AI Studio).
 - **Blocker (parked 2 Jul):** Expo Go on Nikhil's S25 Ultra won't load the app — endless white spinner. Ruled out: firewall (rule added, admin), network category (set Private), manifest/server (healthy, phone browser CAN reach http://192.168.1.44:8081/status), URL typos (QR scan tried). Prime remaining suspects: Expo Go SDK version mismatch vs SDK 57 (check Expo Go version number first!), corporate endpoint protection on the laptop, router client isolation. Workaround if unsolved: USB + adb reverse, or EAS dev build.
 - **Note:** Building on Nikhil's Windows 11 laptop (not Mac — setup guide's Homebrew steps skipped). Personal accounts only, never company resources. GitHub: https://github.com/6nicky6/Bazinggaa.git (identity 6nicky6, never work email).
 
