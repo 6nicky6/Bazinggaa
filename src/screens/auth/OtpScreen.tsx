@@ -9,27 +9,53 @@ import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import { useAppStore } from '../../store/appStore';
 import { backendMode } from '../../services/supabase';
+import { fetchMyProfile, OtpTarget, verifyOtp } from '../../services/live';
 
-// 6-digit OTP. Demo mode: any 6 digits verify instantly.
+// 6-digit OTP. Demo mode: any 6 digits verify. Live mode: real SMS/email code.
 const LEN = 6;
 
 export default function OtpScreen({ navigation, route }: any) {
-  const phone: string = route.params?.phone ?? '';
+  const target: OtpTarget = route.params?.target ?? { phone: route.params?.phone ?? '' };
+  const label: string = route.params?.label ?? target.email ?? target.phone ?? '';
   const [digits, setDigits] = useState('');
   const [verified, setVerified] = useState(false);
+  const [error, setError] = useState('');
   const inputRef = useRef<TextInput>(null);
   const signIn = useAppStore((s) => s.signIn);
+  const completeProfile = useAppStore((s) => s.completeProfile);
 
   useEffect(() => {
-    if (digits.length === LEN) {
+    if (digits.length !== LEN) return;
+    let cancelled = false;
+
+    const finish = async () => {
+      if (backendMode === 'live') {
+        const res = await verifyOtp(target, digits);
+        if (cancelled) return;
+        if (!res.ok) {
+          setError('Wrong code — try again.');
+          setDigits('');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+          return;
+        }
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      setError('');
       setVerified(true);
-      const t = setTimeout(() => {
-        signIn(phone);
-        navigation.navigate('ProfileSetup');
+      // returning live user? skip profile setup
+      const existing = backendMode === 'live' ? await fetchMyProfile() : null;
+      if (cancelled) return;
+      setTimeout(() => {
+        signIn(label);
+        if (existing) {
+          completeProfile(existing); // authed + named → navigator jumps to Main
+        } else {
+          navigation.navigate('ProfileSetup');
+        }
       }, 650);
-      return () => clearTimeout(t);
-    }
+    };
+    finish();
+    return () => { cancelled = true; };
   }, [digits]);
 
   return (
@@ -44,7 +70,7 @@ export default function OtpScreen({ navigation, route }: any) {
           Enter the code
         </Animated.Text>
         <Animated.Text entering={FadeInDown.delay(80).duration(500)} style={styles.subtitle}>
-          Sent to {phone}
+          Sent to {label}
           {backendMode === 'demo' ? '\nDemo mode: type any 6 digits.' : ''}
         </Animated.Text>
 
@@ -80,6 +106,11 @@ export default function OtpScreen({ navigation, route }: any) {
             <Ionicons name="checkmark-circle" size={20} color={colors.online} />
             <Text style={styles.verifiedText}>Verified</Text>
           </Animated.View>
+        )}
+        {!!error && (
+          <Animated.Text entering={ZoomIn.duration(200)} style={styles.errorText}>
+            {error}
+          </Animated.Text>
         )}
 
         <TextInput
@@ -128,6 +159,10 @@ const styles = StyleSheet.create({
     gap: 6, marginTop: 22,
   },
   verifiedText: { color: colors.online, fontSize: 15, fontFamily: fonts.semiBold },
+  errorText: {
+    color: colors.redHot, fontSize: 14, fontFamily: fonts.medium,
+    textAlign: 'center', marginTop: 22,
+  },
   resend: { marginTop: 28, alignSelf: 'center' },
   resendText: { color: colors.textSecondary, fontSize: 14, fontFamily: fonts.regular },
 });

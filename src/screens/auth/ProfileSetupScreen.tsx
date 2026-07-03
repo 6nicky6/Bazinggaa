@@ -11,6 +11,8 @@ import Avatar from '../../components/Avatar';
 import { colors, gradients } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import { useAppStore } from '../../store/appStore';
+import { backendMode } from '../../services/supabase';
+import { upsertProfile } from '../../services/live';
 
 const EMOJIS = ['⚡', '😎', '🦁', '🚀', '🔥', '🌙', '🎧', '🏀', '🌸', '👑', '🎮', '🍕'];
 const GRADS = [
@@ -35,6 +37,10 @@ export default function ProfileSetupScreen() {
       avatarGradient: grad,
     });
     // completing the profile flips `authed`+profile → RootNavigator switches to the app
+    if (backendMode === 'live') {
+      // persist to Supabase (fire-and-forget; store already has it locally)
+      upsertProfile(useAppStore.getState().profile);
+    }
   };
 
   return (

@@ -5,11 +5,16 @@
 ## Status Snapshot
 - **Phase:** 1 — BUILD
 - **Sprint:** FULL APP built (overnight 2 Jul) — every screen + working functionality in demo mode; browser-tested end to end
-- **Next action:** Nikhil reviews in browser → then plug in Supabase + Gemini keys (.env) to go live → resume phone debugging (below)
+- **Next action:** Nikhil does docs/GO_LIVE.md (10 min, from office) → paste 3 keys → live mode ON → resume phone debugging (below)
 - **Blocker (parked 2 Jul):** Expo Go on Nikhil's S25 Ultra won't load the app — endless white spinner. Ruled out: firewall (rule added, admin), network category (set Private), manifest/server (healthy, phone browser CAN reach http://192.168.1.44:8081/status), URL typos (QR scan tried). Prime remaining suspects: Expo Go SDK version mismatch vs SDK 57 (check Expo Go version number first!), corporate endpoint protection on the laptop, router client isolation. Workaround if unsolved: USB + adb reverse, or EAS dev build.
 - **Note:** Building on Nikhil's Windows 11 laptop (not Mac — setup guide's Homebrew steps skipped). Personal accounts only, never company resources. GitHub: https://github.com/6nicky6/Bazinggaa.git (identity 6nicky6, never work email).
 
 ---
+
+### 2026-07-03 — Live backend layer (Supabase)
+- Did: Full live-mode wiring — schema v2 with complete RLS policies + create_direct_chat RPC, live service (auth OTP phone AND email, profiles, contacts, realtime messages, moments, blocks), store routes every action to Supabase in live mode with optimistic updates, returning users skip profile setup, email login is now a first-class free path (SMS needs Twilio — deferred). docs/GO_LIVE.md = Nikhil's 10-min checklist.
+- Broke: Nothing — tsc clean, demo flow re-verified in browser (signup → chat → auto-reply → email path).
+- Next: Nikhil pastes 3 keys → flip live → two-device real chat test.
 
 ### 2026-07-02 — FULL APP (overnight build after Nikhil's feedback)
 - Did: Complete app — auth flow (phone → OTP → profile setup with avatar picker), react-navigation shell (frosted tab bar), full 1:1 chat (bubbles, ticks progressing sent→delivered→read, date separators, typing indicator, contacts that auto-reply with personality), AI Smart Replies (Gemini-ready, mock provider until key added), Moments (feed + gradient composer + full-screen story viewer with progress bars + view counts + delete), Discover, Calls log, Profile/Settings (edit profile, AI toggle, blocked-users manager, notifications, logout), block/report, zustand store persisted to AsyncStorage. Demo mode = fully working offline; .env keys flip it to Supabase/Gemini live.

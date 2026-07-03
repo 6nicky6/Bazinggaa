@@ -12,7 +12,8 @@ import { fonts } from '../theme/typography';
 // Entry point of the auth flow: phone (primary) or email (fallback) —
 // both lead into the verification flow. Demo mode verifies instantly.
 export default function LoginScreen({ navigation }: any) {
-  const onContinue = () => navigation.navigate('Phone');
+  const onContinue = () => navigation.navigate('Phone', { mode: 'phone' });
+  const onEmail = () => navigation.navigate('Phone', { mode: 'email' });
   return (
     <View style={styles.container}>
       <GlowBackground />
@@ -51,7 +52,7 @@ export default function LoginScreen({ navigation }: any) {
         </Animated.View>
 
         <Animated.View entering={FadeInUp.delay(470).duration(550).springify()}>
-          <PressableScale onPress={onContinue} style={styles.glassButton}>
+          <PressableScale onPress={onEmail} style={styles.glassButton}>
             <Ionicons name="mail" size={18} color={colors.white} />
             <Text style={styles.glassButtonText}>Continue with Email</Text>
           </PressableScale>

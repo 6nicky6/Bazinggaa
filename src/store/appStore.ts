@@ -8,9 +8,14 @@ import {
 import {
   CONTACTS, pickReply, seedCalls, seedMessages, seedMoments,
 } from '../services/personas';
+import { backendMode } from '../services/supabase';
+import * as live from '../services/live';
+
+const isLive = backendMode === 'live';
 
 let idc = 0;
 const uid = () => `${Date.now().toString(36)}-${(idc++).toString(36)}`;
+let liveUnsub: (() => void) | null = null;
 
 type State = {
   hydrated: boolean;
@@ -34,7 +39,8 @@ type State = {
   signOut: () => void;
   sendMessage: (chatId: string, text: string) => void;
   markChatRead: (chatId: string) => void;
-  ensureChat: (contactId: string) => string;
+  ensureChat: (contactId: string) => Promise<string | null>;
+  bootLive: () => Promise<void>;
   togglePin: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
   block: (contactId: string) => void;
@@ -112,18 +118,21 @@ export const useAppStore = create<State>()(
       authed: false,
       onboarded: false,
       profile: defaultProfile,
-      contacts: CONTACTS,
-      chats: [
-        { id: 'aisha', contactId: 'aisha' },
-        { id: 'mom', contactId: 'mom' },
-        { id: 'rahul', contactId: 'rahul' },
-        { id: 'zara', contactId: 'zara' },
-        { id: 'dad', contactId: 'dad' },
-        { id: 'welcome', contactId: 'sana' },
-      ],
-      messages: seedMessages(),
-      moments: seedMoments(),
-      calls: seedCalls(),
+      // live mode starts empty and fills from Supabase in bootLive()
+      contacts: isLive ? [] : CONTACTS,
+      chats: isLive
+        ? []
+        : [
+            { id: 'aisha', contactId: 'aisha' },
+            { id: 'mom', contactId: 'mom' },
+            { id: 'rahul', contactId: 'rahul' },
+            { id: 'zara', contactId: 'zara' },
+            { id: 'dad', contactId: 'dad' },
+            { id: 'welcome', contactId: 'sana' },
+          ],
+      messages: isLive ? [] : seedMessages(),
+      moments: isLive ? [] : seedMoments(),
+      calls: isLive ? [] : seedCalls(),
       blocked: [],
       typing: {},
       lastReadAt: { aisha: 0, mom: 0, rahul: Date.now(), zara: 0, dad: Date.now(), welcome: 0 },
@@ -132,26 +141,83 @@ export const useAppStore = create<State>()(
       setOnboarded: () => set({ onboarded: true }),
       signIn: (phone) => set((st) => ({ authed: true, profile: { ...st.profile, phone } })),
       completeProfile: (p) => set((st) => ({ profile: { ...st.profile, ...p } })),
-      signOut: () => set({ authed: false, profile: defaultProfile }),
+      signOut: () => {
+        if (isLive) {
+          liveUnsub?.();
+          liveUnsub = null;
+          live.signOutLive();
+          set({
+            authed: false, profile: defaultProfile,
+            contacts: [], chats: [], messages: [], moments: [], blocked: [],
+          });
+        } else {
+          set({ authed: false, profile: defaultProfile });
+        }
+      },
 
       sendMessage: (chatId, text) => {
+        const tempId = uid();
         const msg: Message = {
-          id: uid(), chatId, senderId: 'me', text,
-          sentAt: Date.now(), status: 'sent',
+          id: tempId, chatId, senderId: 'me', text,
+          sentAt: Date.now(), status: isLive ? 'sending' : 'sent',
         };
         set((st) => ({ messages: [...st.messages, msg] }));
-        scheduleAutoReply(chatId, text);
+        if (isLive) {
+          live.sendMessageLive(chatId, text).then((serverMsg) => {
+            set((st) => ({
+              messages: serverMsg
+                ? st.messages.map((m) => (m.id === tempId ? serverMsg : m))
+                : st.messages.filter((m) => m.id !== tempId), // failed → remove optimistic
+            }));
+          });
+        } else {
+          scheduleAutoReply(chatId, text);
+        }
       },
 
       markChatRead: (chatId) =>
         set((st) => ({ lastReadAt: { ...st.lastReadAt, [chatId]: Date.now() } })),
 
-      ensureChat: (contactId) => {
+      ensureChat: async (contactId) => {
         const existing = get().chats.find((c) => c.contactId === contactId);
         if (existing) return existing.id;
+        if (isLive) {
+          const chatId = await live.ensureDirectChat(contactId);
+          if (!chatId) return null;
+          set((st) => ({ chats: [{ id: chatId, contactId }, ...st.chats] }));
+          return chatId;
+        }
         const chat: Chat = { id: contactId, contactId };
         set((st) => ({ chats: [chat, ...st.chats] }));
         return chat.id;
+      },
+
+      bootLive: async () => {
+        if (!isLive) return;
+        const data = await live.loadAll();
+        if (data) {
+          set({
+            contacts: data.contacts,
+            chats: data.chats,
+            messages: data.messages,
+            moments: data.moments,
+            blocked: data.blocked,
+            calls: [],
+          });
+        }
+        liveUnsub?.();
+        liveUnsub = live.subscribeLive({
+          onMessage: (m) => {
+            set((st) =>
+              st.messages.some((x) => x.id === m.id)
+                ? st // already have it (own optimistic replaced by server copy)
+                : { messages: [...st.messages, m] }
+            );
+          },
+          onMomentChange: () => {
+            live.loadAll().then((d) => d && set({ moments: d.moments }));
+          },
+        });
       },
 
       togglePin: (chatId) =>
@@ -165,12 +231,16 @@ export const useAppStore = create<State>()(
           messages: st.messages.filter((m) => m.chatId !== chatId),
         })),
 
-      block: (contactId) =>
-        set((st) => ({ blocked: [...new Set([...st.blocked, contactId])] })),
-      unblock: (contactId) =>
-        set((st) => ({ blocked: st.blocked.filter((b) => b !== contactId) })),
+      block: (contactId) => {
+        set((st) => ({ blocked: [...new Set([...st.blocked, contactId])] }));
+        if (isLive) live.blockLive(contactId);
+      },
+      unblock: (contactId) => {
+        set((st) => ({ blocked: st.blocked.filter((b) => b !== contactId) }));
+        if (isLive) live.unblockLive(contactId);
+      },
 
-      postMoment: (text, gradient) =>
+      postMoment: (text, gradient) => {
         set((st) => ({
           moments: [
             {
@@ -180,17 +250,23 @@ export const useAppStore = create<State>()(
             },
             ...st.moments,
           ],
-        })),
-      viewMoment: (momentId) =>
+        }));
+        if (isLive) live.postMomentLive(text, gradient); // realtime refresh syncs real id
+      },
+      viewMoment: (momentId) => {
         set((st) => ({
           moments: st.moments.map((m) =>
             m.id === momentId && !m.views.includes('me')
               ? { ...m, views: [...m.views, 'me'] }
               : m
           ),
-        })),
-      deleteMoment: (momentId) =>
-        set((st) => ({ moments: st.moments.filter((m) => m.id !== momentId) })),
+        }));
+        if (isLive) live.viewMomentLive(momentId);
+      },
+      deleteMoment: (momentId) => {
+        set((st) => ({ moments: st.moments.filter((m) => m.id !== momentId) }));
+        if (isLive) live.deleteMomentLive(momentId);
+      },
 
       setSetting: (k, v) =>
         set((st) => ({ settings: { ...st.settings, [k]: v } })),

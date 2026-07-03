@@ -31,3 +31,13 @@ export const gradients = {
   avatar4: ['#DB2777', '#F472B6'] as const,
   avatar5: ['#EA580C', '#FB923C'] as const,
 };
+
+// Indexable list for live mode: DB stores avatar_gradient as an index.
+export const avatarGradients: readonly (readonly [string, string])[] = [
+  gradients.primary,
+  gradients.avatar1,
+  gradients.avatar2,
+  gradients.avatar3,
+  gradients.avatar4,
+  gradients.avatar5,
+];

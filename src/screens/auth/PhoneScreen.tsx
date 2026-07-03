@@ -10,12 +10,38 @@ import PressableScale from '../../components/PressableScale';
 import { colors, gradients } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import { backendMode } from '../../services/supabase';
+import { sendOtp } from '../../services/live';
 
-// Phone entry. Demo mode: any number works. Live mode: Supabase OTP (Sprint 2 wiring).
-export default function PhoneScreen({ navigation }: any) {
+// Phone or email entry (route.params.mode). Demo mode: anything works.
+// Live mode: real Supabase OTP — email is free, SMS needs Twilio configured.
+export default function PhoneScreen({ navigation, route }: any) {
+  const isEmail = route.params?.mode === 'email';
   const [code, setCode] = useState('+971');
   const [phone, setPhone] = useState('');
-  const valid = phone.replace(/\D/g, '').length >= 7;
+  const [email, setEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const valid = isEmail
+    ? /^\S+@\S+\.\S+$/.test(email.trim())
+    : phone.replace(/\D/g, '').length >= 7;
+
+  const submit = async () => {
+    if (!valid || sending) return;
+    const target = isEmail
+      ? { email: email.trim().toLowerCase() }
+      : { phone: `${code}${phone.replace(/\D/g, '')}` };
+    if (backendMode === 'live') {
+      setSending(true);
+      setError('');
+      const res = await sendOtp(target);
+      setSending(false);
+      if (!res.ok) {
+        setError(res.error ?? 'Could not send code. Try again.');
+        return;
+      }
+    }
+    navigation.navigate('Otp', { target, label: isEmail ? target.email : target.phone });
+  };
 
   return (
     <KeyboardAvoidingView
@@ -31,38 +57,58 @@ export default function PhoneScreen({ navigation }: any) {
         </Animated.View>
 
         <Animated.Text entering={FadeInDown.delay(80).duration(500)} style={styles.title}>
-          Your phone number
+          {isEmail ? 'Your email' : 'Your phone number'}
         </Animated.Text>
         <Animated.Text entering={FadeInDown.delay(160).duration(500)} style={styles.subtitle}>
           We'll send you a verification code.{'\n'}
-          {backendMode === 'demo' ? 'Demo mode: any number works for now.' : 'Standard SMS rates may apply.'}
+          {backendMode === 'demo'
+            ? `Demo mode: any ${isEmail ? 'email' : 'number'} works for now.`
+            : isEmail
+            ? 'Check your inbox (and spam) for the code.'
+            : 'Standard SMS rates may apply.'}
         </Animated.Text>
 
         <Animated.View entering={FadeInDown.delay(240).duration(500)} style={styles.inputRow}>
-          <TextInput
-            style={styles.codeInput}
-            value={code}
-            onChangeText={setCode}
-            keyboardType="phone-pad"
-            maxLength={5}
-          />
-          <TextInput
-            style={styles.phoneInput}
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="50 123 4567"
-            placeholderTextColor={colors.textTertiary}
-            keyboardType="phone-pad"
-            autoFocus
-          />
+          {isEmail ? (
+            <TextInput
+              style={styles.phoneInput}
+              value={email}
+              onChangeText={setEmail}
+              placeholder="you@example.com"
+              placeholderTextColor={colors.textTertiary}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoFocus
+            />
+          ) : (
+            <>
+              <TextInput
+                style={styles.codeInput}
+                value={code}
+                onChangeText={setCode}
+                keyboardType="phone-pad"
+                maxLength={5}
+              />
+              <TextInput
+                style={styles.phoneInput}
+                value={phone}
+                onChangeText={setPhone}
+                placeholder="50 123 4567"
+                placeholderTextColor={colors.textTertiary}
+                keyboardType="phone-pad"
+                autoFocus
+              />
+            </>
+          )}
         </Animated.View>
       </View>
 
       <Animated.View entering={FadeInUp.delay(300).duration(500)} style={styles.footer}>
+        {!!error && <Text style={styles.error}>{error}</Text>}
         <PressableScale
-          onPress={() => valid && navigation.navigate('Otp', { phone: `${code} ${phone}` })}
-          style={[styles.cta, !valid && { opacity: 0.4 }]}
-          disabled={!valid}
+          onPress={submit}
+          style={[styles.cta, (!valid || sending) && { opacity: 0.4 }]}
+          disabled={!valid || sending}
         >
           <LinearGradient
             colors={gradients.primary}
@@ -70,7 +116,7 @@ export default function PhoneScreen({ navigation }: any) {
             end={{ x: 1, y: 1 }}
             style={styles.ctaInner}
           >
-            <Text style={styles.ctaText}>Send Code</Text>
+            <Text style={styles.ctaText}>{sending ? 'Sending…' : 'Send Code'}</Text>
             <Ionicons name="arrow-forward" size={18} color={colors.white} />
           </LinearGradient>
         </PressableScale>
@@ -104,6 +150,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18, paddingVertical: 15,
   },
   footer: { paddingHorizontal: 26, paddingBottom: 36 },
+  error: {
+    color: colors.redHot, fontSize: 13, fontFamily: fonts.medium,
+    textAlign: 'center', marginBottom: 10,
+  },
   cta: {
     borderRadius: 30, shadowColor: colors.red, shadowOpacity: 0.5,
     shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 12,

@@ -54,9 +54,9 @@ export default function ContactsScreen({ navigation }: any) {
             <PressableScale
               haptic={false}
               style={styles.row}
-              onPress={() => {
-                const chatId = ensureChat(item.id);
-                navigation.replace('Chat', { chatId });
+              onPress={async () => {
+                const chatId = await ensureChat(item.id);
+                if (chatId) navigation.replace('Chat', { chatId });
               }}
             >
               <Avatar gradient={item.gradient} label={item.initials} size={50} online={item.online} />

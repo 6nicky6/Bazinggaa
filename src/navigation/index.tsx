@@ -94,6 +94,12 @@ const theme = {
 export default function RootNavigator() {
   const authed = useAppStore((s) => s.authed);
   const hasProfile = useAppStore((s) => !!s.profile.name);
+  const bootLive = useAppStore((s) => s.bootLive);
+
+  // live mode: load real data + subscribe to realtime once signed in
+  React.useEffect(() => {
+    if (authed && hasProfile) bootLive();
+  }, [authed, hasProfile]);
 
   return (
     <NavigationContainer theme={theme}>
