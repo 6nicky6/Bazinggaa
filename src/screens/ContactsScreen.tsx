@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -8,20 +8,45 @@ import Avatar from '../components/Avatar';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
+import { backendMode } from '../services/supabase';
+import { searchProfiles } from '../services/live';
+import { Contact } from '../types';
 
-// New chat: pick a contact, jump into (or create) the 1:1 chat.
+// New chat. Demo: pick from the crew. Live: search by @username or name —
+// nobody browses the whole userbase (privacy by design).
 export default function ContactsScreen({ navigation }: any) {
   const contacts = useAppStore((s) => s.contacts);
+  const chats = useAppStore((s) => s.chats);
   const blocked = useAppStore((s) => s.blocked);
   const ensureChat = useAppStore((s) => s.ensureChat);
   const [q, setQ] = useState('');
+  const [found, setFound] = useState<Contact[]>([]);
+  const isLive = backendMode === 'live';
+
+  // live search with debounce
+  useEffect(() => {
+    if (!isLive || q.trim().length < 2) {
+      setFound([]);
+      return;
+    }
+    const t = setTimeout(() => {
+      searchProfiles(q).then((r) => setFound(r.filter((c) => !blocked.includes(c.id))));
+    }, 350);
+    return () => clearTimeout(t);
+  }, [q]);
 
   const list = useMemo(() => {
+    if (isLive) {
+      if (q.trim().length >= 2) return found;
+      // no query: only people you already have chats with (+ bot)
+      const known = new Set(chats.map((c) => c.contactId));
+      return contacts.filter((c) => known.has(c.id) && !blocked.includes(c.id));
+    }
     const base = contacts.filter((c) => !blocked.includes(c.id));
     if (!q.trim()) return base;
     const t = q.trim().toLowerCase();
     return base.filter((c) => c.name.toLowerCase().includes(t) || c.username.includes(t));
-  }, [contacts, blocked, q]);
+  }, [contacts, chats, blocked, q, found]);
 
   return (
     <View style={styles.container}>
@@ -37,7 +62,7 @@ export default function ContactsScreen({ navigation }: any) {
         <Ionicons name="search" size={16} color={colors.textTertiary} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search name or @username"
+          placeholder={backendMode === 'live' ? 'Find people by @username or name' : 'Search name or @username'}
           placeholderTextColor={colors.textTertiary}
           value={q}
           onChangeText={setQ}

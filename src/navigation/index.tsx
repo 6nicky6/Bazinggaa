@@ -17,6 +17,7 @@ import ChatListScreen from '../screens/ChatListScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ContactsScreen from '../screens/ContactsScreen';
 import NewGroupScreen from '../screens/NewGroupScreen';
+import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import MomentsScreen from '../screens/MomentsScreen';
 import MomentComposerScreen from '../screens/MomentComposerScreen';
 import MomentViewerScreen from '../screens/MomentViewerScreen';
@@ -118,6 +119,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Phone" component={PhoneScreen} />
             <Stack.Screen name="Otp" component={OtpScreen} />
             <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
+            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
           </>
         ) : (
           <>
@@ -125,6 +127,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Chat" component={ChatScreen} />
             <Stack.Screen name="Contacts" component={ContactsScreen} />
             <Stack.Screen name="NewGroup" component={NewGroupScreen} />
+            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
             <Stack.Screen
               name="MomentComposer"
               component={MomentComposerScreen}

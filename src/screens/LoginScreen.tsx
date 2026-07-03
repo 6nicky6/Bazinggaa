@@ -58,13 +58,18 @@ export default function LoginScreen({ navigation }: any) {
           </PressableScale>
         </Animated.View>
 
-        <Animated.Text
-          entering={FadeInUp.delay(600).duration(500)}
-          style={styles.terms}
-        >
-          By continuing you agree to our Terms of Service{'\n'}and Privacy
-          Policy.
-        </Animated.Text>
+        <Animated.View entering={FadeInUp.delay(600).duration(500)}>
+          <Text style={styles.terms}>
+            By continuing you agree to our{'\n'}
+            <Text
+              style={styles.termsLink}
+              onPress={() => navigation.navigate('PrivacyPolicy')}
+              suppressHighlighting
+            >
+              Terms of Service and Privacy Policy
+            </Text>
+          </Text>
+        </Animated.View>
       </View>
     </View>
   );
@@ -144,5 +149,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
     marginTop: 6,
+  },
+  termsLink: {
+    color: colors.textSecondary,
+    textDecorationLine: 'underline',
   },
 });

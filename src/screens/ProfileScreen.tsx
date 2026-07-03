@@ -13,7 +13,7 @@ import { useAppStore } from '../store/appStore';
 import { aiProviderName } from '../services/ai';
 import { backendMode } from '../services/supabase';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }: any) {
   const profile = useAppStore((s) => s.profile);
   const settings = useAppStore((s) => s.settings);
   const setSetting = useAppStore((s) => s.setSetting);
@@ -99,6 +99,12 @@ export default function ProfileScreen() {
               label="Backend"
               sub={backendMode === 'live' ? 'Supabase (live)' : 'Demo mode — add keys in .env for live'}
             />
+            <View style={styles.divider} />
+            <PressableScale haptic={false} onPress={() => navigation.navigate('PrivacyPolicy')}>
+              <Row icon="document-text" label="Privacy Policy & Terms" sub="How your data is handled">
+                <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
+              </Row>
+            </PressableScale>
             <View style={styles.divider} />
             <Row icon="information-circle" label="About" sub="Bazingga v0.1.0 · Fast. Private. Expressive." />
           </View>

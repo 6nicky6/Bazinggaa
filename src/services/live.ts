@@ -176,6 +176,30 @@ function toMessage(m: any, uid: string): Message {
 }
 
 // ---------- chat ops ----------
+// discovery: find people by @username or name — no browsing the whole userbase
+export async function searchProfiles(query: string): Promise<Contact[]> {
+  if (!supabase) return [];
+  const uid = await myUserId();
+  const q = query.trim().replace(/^@/, '');
+  if (q.length < 2) return [];
+  const { data } = await supabase
+    .from('profiles')
+    .select('*')
+    .or(`username.ilike.${q}%,name.ilike.${q}%`)
+    .neq('id', uid ?? '')
+    .limit(10);
+  return (data ?? []).map((p: any) => ({
+    id: p.id,
+    name: p.name || p.username || 'User',
+    username: p.username ?? '',
+    status: p.status ?? '',
+    gradient: gradFor(p.avatar_gradient),
+    initials: (p.avatar_emoji as string) || (p.name?.[0] ?? '?').toUpperCase(),
+    group: 'Friends' as const,
+    online: false,
+  }));
+}
+
 export async function createGroupLive(
   kind: 'group' | 'channel', name: string, icon: string, memberIds: string[]
 ): Promise<string | null> {
