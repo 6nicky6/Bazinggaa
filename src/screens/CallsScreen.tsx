@@ -20,12 +20,8 @@ function callTime(ts: number) {
 export default function CallsScreen() {
   const calls = useAppStore((s) => s.calls);
   const contacts = useAppStore((s) => s.contacts);
+  const startCall = useAppStore((s) => s.startCall);
   const [toast, setToast] = useState(false);
-
-  const comingSoon = () => {
-    setToast(true);
-    setTimeout(() => setToast(false), 2200);
-  };
 
   return (
     <View style={styles.container}>
@@ -62,7 +58,7 @@ export default function CallsScreen() {
                     </Text>
                   </View>
                 </View>
-                <PressableScale haptic={false} style={styles.callBtn} onPress={comingSoon}>
+                <PressableScale haptic={false} style={styles.callBtn} onPress={() => startCall(contact.id, item.video)}>
                   <Ionicons name={item.video ? 'videocam' : 'call'} size={20} color={colors.yellow} />
                 </PressableScale>
               </View>

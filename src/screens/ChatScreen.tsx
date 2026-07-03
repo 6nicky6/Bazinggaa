@@ -56,6 +56,7 @@ export default function ChatScreen({ navigation, route }: any) {
   const sendMessage = useAppStore((s) => s.sendMessage);
   const markChatRead = useAppStore((s) => s.markChatRead);
   const retryMessage = useAppStore((s) => s.retryMessage);
+  const startCall = useAppStore((s) => s.startCall);
   const block = useAppStore((s) => s.block);
   const blocked = useAppStore((s) => s.blocked);
   const smartOn = useAppStore((s) => s.settings.smartReplies);
@@ -138,10 +139,10 @@ export default function ChatScreen({ navigation, route }: any) {
               : 'on Bazingga' /* live: honest until real presence ships */}
           </Text>
         </View>
-        <PressableScale haptic={false} style={styles.headerBtn} onPress={() => {}}>
+        <PressableScale haptic={false} style={styles.headerBtn} onPress={() => startCall(contact.id, true)}>
           <Ionicons name="videocam-outline" size={22} color={colors.textSecondary} />
         </PressableScale>
-        <PressableScale haptic={false} style={styles.headerBtn} onPress={() => {}}>
+        <PressableScale haptic={false} style={styles.headerBtn} onPress={() => startCall(contact.id, false)}>
           <Ionicons name="call-outline" size={20} color={colors.textSecondary} />
         </PressableScale>
         <PressableScale haptic={false} style={styles.headerBtn} onPress={() => setMenuOpen(true)}>

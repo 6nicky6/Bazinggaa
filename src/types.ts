@@ -25,9 +25,23 @@ export type Contact = {
 
 export type Chat = {
   id: string;
-  contactId: string;
+  contactId: string; // direct: other user; group/channel: '' (members list instead)
+  kind?: 'direct' | 'group' | 'channel';
+  name?: string; // group/channel display name
+  iconEmoji?: string;
+  memberIds?: string[];
+  myRole?: 'owner' | 'admin' | 'member';
   pinned?: boolean;
   muted?: boolean;
+};
+
+export type CallState = {
+  id: string;
+  contactId: string;
+  video: boolean;
+  direction: 'outgoing' | 'incoming';
+  status: 'ringing' | 'accepted' | 'declined' | 'ended' | 'missed';
+  startedAt: number;
 };
 
 export type Moment = {

@@ -3,13 +3,14 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { gradients } from '../theme/colors';
 import {
-  CallLog, Chat, Contact, Message, Moment, Profile,
+  CallLog, CallState, Chat, Contact, Message, Moment, Profile,
 } from '../types';
 import {
   CONTACTS, pickReply, seedCalls, seedMessages, seedMoments,
 } from '../services/personas';
 import { backendMode } from '../services/supabase';
 import * as live from '../services/live';
+import { BOT_CONTACT, BOT_ID, botReply } from '../services/bot';
 
 const isLive = backendMode === 'live';
 
@@ -39,6 +40,10 @@ type State = {
   signOut: () => void;
   sendMessage: (chatId: string, text: string) => void;
   retryMessage: (messageId: string) => void;
+  activeCall: CallState | null;
+  startCall: (contactId: string, video: boolean) => void;
+  answerCall: (accept: boolean) => void;
+  endCall: () => void;
   markChatRead: (chatId: string) => void;
   ensureChat: (contactId: string) => Promise<string | null>;
   bootLive: () => Promise<void>;
@@ -120,11 +125,13 @@ export const useAppStore = create<State>()(
       authed: false,
       onboarded: false,
       profile: defaultProfile,
-      // live mode starts empty and fills from Supabase in bootLive()
-      contacts: isLive ? [] : CONTACTS,
+      // live mode starts near-empty and fills from Supabase in bootLive();
+      // BazinggaBot lives locally in BOTH modes (client-side AI contact)
+      contacts: isLive ? [BOT_CONTACT] : [...CONTACTS, BOT_CONTACT],
       chats: isLive
-        ? []
+        ? [{ id: BOT_ID, contactId: BOT_ID }]
         : [
+            { id: BOT_ID, contactId: BOT_ID },
             { id: 'aisha', contactId: 'aisha' },
             { id: 'mom', contactId: 'mom' },
             { id: 'rahul', contactId: 'rahul' },
@@ -132,7 +139,14 @@ export const useAppStore = create<State>()(
             { id: 'dad', contactId: 'dad' },
             { id: 'welcome', contactId: 'sana' },
           ],
-      messages: isLive ? [] : seedMessages(),
+      messages: [
+        {
+          id: 'bot-hello', chatId: BOT_ID, senderId: BOT_ID,
+          text: "Hey! I'm BazinggaBot, your AI sidekick ⚡ Ask me anything — questions, jokes, help with the app. I'm all yours.",
+          sentAt: Date.now() - 60_000, status: 'read' as const,
+        },
+        ...(isLive ? [] : seedMessages()),
+      ],
       moments: isLive ? [] : seedMoments(),
       calls: isLive ? [] : seedCalls(),
       blocked: [],
@@ -164,6 +178,27 @@ export const useAppStore = create<State>()(
           sentAt: Date.now(), status: isLive ? 'sending' : 'sent',
         };
         set((st) => ({ messages: [...st.messages, msg] }));
+        if (chatId === BOT_ID) {
+          // BazinggaBot: local echo + real Gemini reply with typing indicator
+          set((st) => ({
+            messages: st.messages.map((m) => (m.id === tempId ? { ...m, status: 'read' as const } : m)),
+          }));
+          setTimeout(() => set((st) => ({ typing: { ...st.typing, [BOT_ID]: true } })), 350);
+          const history = get()
+            .messages.filter((m) => m.chatId === BOT_ID)
+            .slice(-12)
+            .map((m) => ({ role: (m.senderId === 'me' ? 'user' : 'model') as 'user' | 'model', text: m.text }));
+          botReply([...history, { role: 'user', text }]).then((reply) => {
+            set((st) => ({
+              typing: { ...st.typing, [BOT_ID]: false },
+              messages: [
+                ...st.messages,
+                { id: uid(), chatId: BOT_ID, senderId: BOT_ID, text: reply, sentAt: Date.now(), status: 'read' as const },
+              ],
+            }));
+          });
+          return;
+        }
         if (isLive) {
           live.sendMessageLive(chatId, text).then((serverMsg) => {
             set((st) => ({
@@ -219,14 +254,21 @@ export const useAppStore = create<State>()(
         if (!isLive) return;
         const data = await live.loadAll();
         if (data) {
-          set({
-            contacts: data.contacts,
-            chats: data.chats,
-            messages: data.messages,
+          set((st) => ({
+            contacts: [BOT_CONTACT, ...data.contacts],
+            chats: [
+              ...st.chats.filter((c) => c.id === BOT_ID),
+              ...data.chats,
+            ],
+            // server messages + local bot history (bot is client-side)
+            messages: [
+              ...data.messages,
+              ...st.messages.filter((m) => m.chatId === BOT_ID),
+            ],
             moments: data.moments,
             blocked: data.blocked,
-            calls: [],
-          });
+            calls: st.calls,
+          }));
         }
         liveUnsub?.();
         liveUnsub = live.subscribeLive({
@@ -239,6 +281,24 @@ export const useAppStore = create<State>()(
           },
           onMomentChange: () => {
             live.loadAll().then((d) => d && set({ moments: d.moments }));
+          },
+          onCall: (row, myId) => {
+            const st = get();
+            if (row.callee_id === myId && row.status === 'ringing' && !st.activeCall) {
+              set({
+                activeCall: {
+                  id: row.id, contactId: row.caller_id, video: !!row.video,
+                  direction: 'incoming', status: 'ringing',
+                  startedAt: Date.now(),
+                },
+              });
+            } else if (st.activeCall && row.id === st.activeCall.id) {
+              if (row.status === 'accepted' && st.activeCall.status === 'ringing') {
+                set({ activeCall: { ...st.activeCall, status: 'accepted', startedAt: Date.now() } });
+              } else if (['declined', 'ended', 'missed'].includes(row.status)) {
+                get().endCall();
+              }
+            }
           },
         });
       },
@@ -289,6 +349,74 @@ export const useAppStore = create<State>()(
       deleteMoment: (momentId) => {
         set((st) => ({ moments: st.moments.filter((m) => m.id !== momentId) }));
         if (isLive) live.deleteMomentLive(momentId);
+      },
+
+      activeCall: null,
+
+      startCall: (contactId, video) => {
+        const callId = uid();
+        const chat = get().chats.find((c) => c.contactId === contactId);
+        set({
+          activeCall: {
+            id: callId, contactId, video,
+            direction: 'outgoing', status: 'ringing', startedAt: Date.now(),
+          },
+        });
+        if (isLive && chat) {
+          live.startCallLive(chat.id, contactId, video).then((serverId) => {
+            if (serverId) {
+              set((st) => st.activeCall?.id === callId
+                ? { activeCall: { ...st.activeCall, id: serverId } }
+                : {});
+            }
+          });
+        } else {
+          // demo: contact "answers" after a few rings
+          setTimeout(() => {
+            set((st) =>
+              st.activeCall?.id === callId && st.activeCall.status === 'ringing'
+                ? { activeCall: { ...st.activeCall, status: 'accepted' as const, startedAt: Date.now() } }
+                : {}
+            );
+          }, 3500);
+        }
+      },
+
+      answerCall: (accept) => {
+        const call = get().activeCall;
+        if (!call) return;
+        if (isLive) live.updateCallLive(call.id, accept ? 'accepted' : 'declined');
+        set((st) => ({
+          activeCall: accept
+            ? { ...call, status: 'accepted' as const, startedAt: Date.now() }
+            : null,
+          calls: accept
+            ? st.calls
+            : [
+                {
+                  id: call.id, contactId: call.contactId, at: call.startedAt,
+                  direction: call.direction, missed: true, video: call.video,
+                },
+                ...st.calls,
+              ],
+        }));
+      },
+
+      endCall: () => {
+        const call = get().activeCall;
+        if (!call) return;
+        const final = call.status === 'ringing' ? 'missed' : 'ended';
+        if (isLive) live.updateCallLive(call.id, final as 'ended' | 'missed');
+        set((st) => ({
+          activeCall: null,
+          calls: [
+            {
+              id: call.id, contactId: call.contactId, at: call.startedAt,
+              direction: call.direction, missed: final === 'missed', video: call.video,
+            },
+            ...st.calls,
+          ],
+        }));
       },
 
       setSetting: (k, v) =>

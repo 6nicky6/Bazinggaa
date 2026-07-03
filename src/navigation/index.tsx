@@ -20,6 +20,7 @@ import MomentsScreen from '../screens/MomentsScreen';
 import MomentComposerScreen from '../screens/MomentComposerScreen';
 import MomentViewerScreen from '../screens/MomentViewerScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
+import CallOverlay from '../screens/CallOverlay';
 import CallsScreen from '../screens/CallsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
@@ -135,6 +136,7 @@ export default function RootNavigator() {
           </>
         )}
       </Stack.Navigator>
+      <CallOverlay />
     </NavigationContainer>
   );
 }

@@ -231,10 +231,36 @@ export async function unblockLive(otherUserId: string) {
   await supabase.from('blocks').delete().match({ blocker_id: uid, blocked_id: otherUserId });
 }
 
+// ---------- calls (signaling; media ships with the dev-client build) ----------
+export async function startCallLive(chatId: string, calleeId: string, video: boolean): Promise<string | null> {
+  if (!supabase) return null;
+  const uid = await myUserId();
+  if (!uid) return null;
+  const { data, error } = await supabase
+    .from('calls')
+    .insert({ chat_id: chatId, caller_id: uid, callee_id: calleeId, video })
+    .select()
+    .single();
+  if (error) {
+    console.warn('[live] startCall:', error.message);
+    return null;
+  }
+  return data.id as string;
+}
+
+export async function updateCallLive(callId: string, status: 'accepted' | 'declined' | 'ended' | 'missed') {
+  if (!supabase) return;
+  await supabase
+    .from('calls')
+    .update({ status, ...(status !== 'accepted' ? { ended_at: new Date().toISOString() } : {}) })
+    .eq('id', callId);
+}
+
 // ---------- realtime ----------
 export function subscribeLive(handlers: {
   onMessage: (m: Message) => void;
   onMomentChange: () => void;
+  onCall?: (row: any, myId: string) => void;
 }): () => void {
   const sb = supabase;
   if (!sb) return () => {};
@@ -249,6 +275,9 @@ export function subscribeLive(handlers: {
     })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'moments' }, () => {
       handlers.onMomentChange();
+    })
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, (payload) => {
+      if (uid && handlers.onCall) handlers.onCall(payload.new, uid);
     })
     .subscribe();
 
