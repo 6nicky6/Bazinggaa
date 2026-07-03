@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { useAudioPlayer } from 'expo-audio';
 import Logo from '../components/Logo';
 import GlowBackground from '../components/GlowBackground';
 import { colors } from '../theme/colors';
@@ -21,6 +22,7 @@ import { fonts } from '../theme/typography';
 type Props = { onDone: () => void };
 
 export default function SplashScreen({ onDone }: Props) {
+  const player = useAudioPlayer(require('../../assets/sounds/splash.wav'));
   const logoScale = useSharedValue(0.2);
   const logoOpacity = useSharedValue(0);
   const wordOpacity = useSharedValue(0);
@@ -29,6 +31,11 @@ export default function SplashScreen({ onDone }: Props) {
   const tagSpacing = useSharedValue(8);
 
   useEffect(() => {
+    // signature sound: whoosh → zap as the bolt lands → sparkle.
+    // (Web browsers may block autoplay before first tap — native always plays.)
+    try {
+      player.play();
+    } catch {}
     logoOpacity.value = withTiming(1, { duration: 350 });
     logoScale.value = withSequence(
       withSpring(1.08, { damping: 9, stiffness: 120 }),
