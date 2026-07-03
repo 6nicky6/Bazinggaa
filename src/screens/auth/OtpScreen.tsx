@@ -9,7 +9,7 @@ import { colors } from '../../theme/colors';
 import { fonts } from '../../theme/typography';
 import { useAppStore } from '../../store/appStore';
 import { backendMode } from '../../services/supabase';
-import { fetchMyProfile, OtpTarget, verifyOtp } from '../../services/live';
+import { fetchMyProfile, OtpTarget, sendOtp, verifyOtp } from '../../services/live';
 
 // 6-digit OTP. Demo mode: any 6 digits verify. Live mode: real SMS/email code.
 const LEN = 6;
@@ -20,7 +20,15 @@ export default function OtpScreen({ navigation, route }: any) {
   const [digits, setDigits] = useState('');
   const [verified, setVerified] = useState(false);
   const [error, setError] = useState('');
+  const [resendIn, setResendIn] = useState(30);
   const inputRef = useRef<TextInput>(null);
+
+  // resend cooldown ticker
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setInterval(() => setResendIn((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, [resendIn > 0]);
   const signIn = useAppStore((s) => s.signIn);
   const completeProfile = useAppStore((s) => s.completeProfile);
 
@@ -123,9 +131,25 @@ export default function OtpScreen({ navigation, route }: any) {
           autoFocus
         />
 
-        <PressableScale haptic={false} style={styles.resend}>
+        <PressableScale
+          haptic={false}
+          style={styles.resend}
+          disabled={resendIn > 0}
+          onPress={async () => {
+            if (resendIn > 0) return;
+            setError('');
+            setResendIn(60);
+            if (backendMode === 'live') {
+              const res = await sendOtp(target);
+              if (!res.ok) setError(res.error ?? 'Could not resend. Try again shortly.');
+            }
+          }}
+        >
           <Text style={styles.resendText}>
-            Didn't get it? <Text style={{ color: colors.yellow }}>Resend code</Text>
+            Didn't get it?{' '}
+            <Text style={{ color: resendIn > 0 ? colors.textTertiary : colors.yellow }}>
+              {resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend code'}
+            </Text>
           </Text>
         </PressableScale>
       </View>

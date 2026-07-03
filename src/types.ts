@@ -1,7 +1,7 @@
 // Shared app types
 export type ChatFilter = 'All' | 'Friends' | 'Family' | 'Work';
 
-export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read';
+export type MessageStatus = 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
 
 export type Message = {
   id: string;

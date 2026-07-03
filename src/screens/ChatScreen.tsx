@@ -14,6 +14,8 @@ import { colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
 import { smartReplies } from '../services/ai';
+import { reportLive } from '../services/live';
+import { backendMode } from '../services/supabase';
 import { Message } from '../types';
 
 function timeStr(ts: number) {
@@ -31,6 +33,7 @@ function dayStr(ts: number) {
 
 function Ticks({ status }: { status: Message['status'] }) {
   if (status === 'sending') return <Ionicons name="time-outline" size={13} color="rgba(255,255,255,0.55)" />;
+  if (status === 'failed') return <Ionicons name="alert-circle" size={14} color={colors.yellow} />;
   if (status === 'sent') return <Ionicons name="checkmark" size={14} color="rgba(255,255,255,0.55)" />;
   return (
     <View style={{ flexDirection: 'row', marginLeft: -4 }}>
@@ -52,6 +55,7 @@ export default function ChatScreen({ navigation, route }: any) {
   const typing = useAppStore((s) => s.typing[chatId]);
   const sendMessage = useAppStore((s) => s.sendMessage);
   const markChatRead = useAppStore((s) => s.markChatRead);
+  const retryMessage = useAppStore((s) => s.retryMessage);
   const block = useAppStore((s) => s.block);
   const blocked = useAppStore((s) => s.blocked);
   const smartOn = useAppStore((s) => s.settings.smartReplies);
@@ -66,6 +70,7 @@ export default function ChatScreen({ navigation, route }: any) {
   const [draft, setDraft] = useState('');
   const [chips, setChips] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [toast, setToast] = useState('');
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -124,7 +129,13 @@ export default function ChatScreen({ navigation, route }: any) {
         <View style={{ flex: 1, marginLeft: 11 }}>
           <Text style={styles.headerName}>{contact.name}</Text>
           <Text style={[styles.headerStatus, typing && { color: colors.yellow }]}>
-            {isBlocked ? 'blocked' : typing ? 'typing…' : contact.online ? 'online' : 'last seen recently'}
+            {isBlocked
+              ? 'blocked'
+              : typing
+              ? 'typing…'
+              : backendMode === 'demo'
+              ? contact.online ? 'online' : 'last seen recently'
+              : 'on Bazingga' /* live: honest until real presence ships */}
           </Text>
         </View>
         <PressableScale haptic={false} style={styles.headerBtn} onPress={() => {}}>
@@ -162,18 +173,28 @@ export default function ChatScreen({ navigation, route }: any) {
               style={[styles.bubbleRow, mine && { justifyContent: 'flex-end' }]}
             >
               {mine ? (
-                <LinearGradient
-                  colors={gradients.primary}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={[styles.bubble, styles.bubbleMine]}
+                <PressableScale
+                  haptic={m.status === 'failed'}
+                  disabled={m.status !== 'failed'}
+                  onPress={() => retryMessage(m.id)}
+                  style={{ maxWidth: '78%' }}
                 >
-                  <Text style={styles.msgText}>{m.text}</Text>
-                  <View style={styles.metaRow}>
-                    <Text style={styles.metaText}>{timeStr(m.sentAt)}</Text>
-                    <Ticks status={m.status} />
-                  </View>
-                </LinearGradient>
+                  <LinearGradient
+                    colors={gradients.primary}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={[styles.bubble, styles.bubbleMine, { maxWidth: '100%' }, m.status === 'failed' && { opacity: 0.7 }]}
+                  >
+                    <Text style={styles.msgText}>{m.text}</Text>
+                    <View style={styles.metaRow}>
+                      {m.status === 'failed' && (
+                        <Text style={[styles.metaText, { color: colors.yellow }]}>Not sent · tap to retry</Text>
+                      )}
+                      <Text style={styles.metaText}>{timeStr(m.sentAt)}</Text>
+                      <Ticks status={m.status} />
+                    </View>
+                  </LinearGradient>
+                </PressableScale>
               ) : (
                 <View style={[styles.bubble, styles.bubbleTheirs]}>
                   <Text style={styles.msgText}>{m.text}</Text>
@@ -260,7 +281,12 @@ export default function ChatScreen({ navigation, route }: any) {
             <PressableScale
               haptic={false}
               style={styles.menuItem}
-              onPress={() => setMenuOpen(false)}
+              onPress={async () => {
+                setMenuOpen(false);
+                const ok = await reportLive(contact.id, 'Reported from chat menu');
+                setToast(ok ? `Report sent. Thank you for keeping Bazingga safe.` : 'Could not send report. Try again.');
+                setTimeout(() => setToast(''), 2500);
+              }}
             >
               <Ionicons name="flag-outline" size={18} color={colors.textSecondary} />
               <Text style={styles.menuText}>Report</Text>
@@ -268,6 +294,13 @@ export default function ChatScreen({ navigation, route }: any) {
           </Animated.View>
         </PressableScale>
       </Modal>
+
+      {toast ? (
+        <Animated.View entering={FadeInUp.springify()} style={styles.toast}>
+          <Ionicons name="shield-checkmark" size={16} color={colors.yellow} />
+          <Text style={styles.toastText}>{toast}</Text>
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
@@ -345,4 +378,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12, borderRadius: 12,
   },
   menuText: { color: colors.white, fontSize: 14.5, fontFamily: fonts.medium },
+  toast: {
+    position: 'absolute', bottom: 110, alignSelf: 'center',
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.glassBorder,
+    borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, maxWidth: '86%',
+  },
+  toastText: { color: colors.white, fontSize: 13, fontFamily: fonts.medium, flexShrink: 1 },
 });

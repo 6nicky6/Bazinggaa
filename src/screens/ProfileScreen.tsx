@@ -77,7 +77,7 @@ export default function ProfileScreen() {
               </Row>
             </PressableScale>
             <View style={styles.divider} />
-            <Row icon="lock-closed" label="End-to-end privacy" sub="Row-level security on all data" />
+            <Row icon="lock-closed" label="Private by design" sub="Server-enforced access rules; E2E encryption on the roadmap" />
           </View>
         </Animated.View>
 

@@ -84,7 +84,10 @@ export default function MomentViewerScreen({ navigation, route }: any) {
           <View style={{ flex: 1, marginLeft: 10 }}>
             <Text style={styles.name}>{isMe ? 'You' : author!.name}</Text>
             <Text style={styles.time}>
-              {Math.max(1, Math.round((Date.now() - moment.createdAt) / 3_600_000))}h ago
+              {(() => {
+                const mins = Math.max(1, Math.round((Date.now() - moment.createdAt) / 60_000));
+                return mins < 60 ? `${mins}m ago` : `${Math.round(mins / 60)}h ago`;
+              })()}
             </Text>
           </View>
           {isMe && (

@@ -38,6 +38,7 @@ type State = {
   completeProfile: (p: Partial<Profile>) => void;
   signOut: () => void;
   sendMessage: (chatId: string, text: string) => void;
+  retryMessage: (messageId: string) => void;
   markChatRead: (chatId: string) => void;
   ensureChat: (contactId: string) => Promise<string | null>;
   bootLive: () => Promise<void>;
@@ -68,6 +69,7 @@ function scheduleAutoReply(chatId: string, myText: string) {
   const contact = s().contacts.find((c) => c.id === s().chats.find((ch) => ch.id === chatId)?.contactId);
   if (!contact) return;
   if (s().blocked.includes(contact.id)) return;
+  if (s().typing[chatId]) return; // already replying — no reply storms on rapid sends
 
   const thinkMs = 1200 + Math.random() * 1800;
   const typeMs = 1100 + Math.random() * 1600;
@@ -165,14 +167,35 @@ export const useAppStore = create<State>()(
         if (isLive) {
           live.sendMessageLive(chatId, text).then((serverMsg) => {
             set((st) => ({
-              messages: serverMsg
-                ? st.messages.map((m) => (m.id === tempId ? serverMsg : m))
-                : st.messages.filter((m) => m.id !== tempId), // failed → remove optimistic
+              messages: st.messages.map((m) =>
+                m.id === tempId
+                  ? serverMsg ?? { ...m, status: 'failed' as const } // never drop a message
+                  : m
+              ),
             }));
           });
         } else {
           scheduleAutoReply(chatId, text);
         }
+      },
+
+      retryMessage: (messageId: string) => {
+        const msg = get().messages.find((m) => m.id === messageId);
+        if (!msg || msg.status !== 'failed') return;
+        set((st) => ({
+          messages: st.messages.map((m) =>
+            m.id === messageId ? { ...m, status: 'sending' as const, sentAt: Date.now() } : m
+          ),
+        }));
+        live.sendMessageLive(msg.chatId, msg.text).then((serverMsg) => {
+          set((st) => ({
+            messages: st.messages.map((m) =>
+              m.id === messageId
+                ? serverMsg ?? { ...m, status: 'failed' as const }
+                : m
+            ),
+          }));
+        });
       },
 
       markChatRead: (chatId) =>

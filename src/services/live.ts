@@ -204,6 +204,19 @@ export async function deleteMomentLive(momentId: string) {
 }
 
 // ---------- safety ----------
+export async function reportLive(reportedUserId: string, reason: string): Promise<boolean> {
+  if (!supabase) return true; // demo mode: accept locally
+  const uid = await myUserId();
+  if (!uid) return false;
+  const { error } = await supabase.from('reports').insert({
+    reporter_id: uid,
+    reported_user_id: reportedUserId,
+    reason,
+  });
+  if (error) console.warn('[live] report:', error.message);
+  return !error;
+}
+
 export async function blockLive(otherUserId: string) {
   if (!supabase) return;
   const uid = await myUserId();
