@@ -46,6 +46,7 @@ type State = {
   endCall: () => void;
   markChatRead: (chatId: string) => void;
   ensureChat: (contactId: string) => Promise<string | null>;
+  createGroup: (kind: 'group' | 'channel', name: string, icon: string, memberIds: string[]) => Promise<string | null>;
   bootLive: () => Promise<void>;
   togglePin: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
@@ -248,6 +249,36 @@ export const useAppStore = create<State>()(
         const chat: Chat = { id: contactId, contactId };
         set((st) => ({ chats: [chat, ...st.chats] }));
         return chat.id;
+      },
+
+      createGroup: async (kind, name, icon, memberIds) => {
+        if (isLive) {
+          const id = await live.createGroupLive(kind, name, icon, memberIds);
+          if (!id) return null;
+          set((st) => ({
+            chats: [
+              { id, contactId: '', kind, name, iconEmoji: icon, memberIds: [...memberIds, 'me'], myRole: 'owner' as const },
+              ...st.chats,
+            ],
+          }));
+          return id;
+        }
+        const id = uid();
+        set((st) => ({
+          chats: [
+            { id, contactId: '', kind, name, iconEmoji: icon, memberIds: [...memberIds, 'me'], myRole: 'owner' as const },
+            ...st.chats,
+          ],
+          messages: [
+            ...st.messages,
+            {
+              id: uid(), chatId: id, senderId: memberIds[0] ?? 'me',
+              text: kind === 'channel' ? `Welcome to ${name} 📢` : `${name} created. Say hi! 👋`,
+              sentAt: Date.now(), status: 'read' as const,
+            },
+          ],
+        }));
+        return id;
       },
 
       bootLive: async () => {

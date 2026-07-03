@@ -45,6 +45,17 @@ export default function ContactsScreen({ navigation }: any) {
         />
       </Animated.View>
 
+      <View style={styles.quickRow}>
+        <PressableScale haptic={false} style={styles.quickBtn} onPress={() => navigation.navigate('NewGroup', { kind: 'group' })}>
+          <Ionicons name="people" size={18} color={colors.yellow} />
+          <Text style={styles.quickText}>New Group</Text>
+        </PressableScale>
+        <PressableScale haptic={false} style={styles.quickBtn} onPress={() => navigation.navigate('NewGroup', { kind: 'channel' })}>
+          <Ionicons name="megaphone" size={17} color={colors.yellow} />
+          <Text style={styles.quickText}>New Channel</Text>
+        </PressableScale>
+      </View>
+
       <FlatList
         data={list}
         keyExtractor={(c) => c.id}
@@ -92,4 +103,11 @@ const styles = StyleSheet.create({
   },
   name: { color: colors.white, fontSize: 15.5, fontFamily: fonts.semiBold },
   status: { color: colors.textSecondary, fontSize: 12.5, fontFamily: fonts.regular, marginTop: 2 },
+  quickRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 10 },
+  quickBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1,
+    backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder,
+    borderRadius: 16, paddingVertical: 12, justifyContent: 'center',
+  },
+  quickText: { color: colors.white, fontSize: 13.5, fontFamily: fonts.semiBold },
 });

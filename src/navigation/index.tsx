@@ -16,6 +16,7 @@ import ProfileSetupScreen from '../screens/auth/ProfileSetupScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ContactsScreen from '../screens/ContactsScreen';
+import NewGroupScreen from '../screens/NewGroupScreen';
 import MomentsScreen from '../screens/MomentsScreen';
 import MomentComposerScreen from '../screens/MomentComposerScreen';
 import MomentViewerScreen from '../screens/MomentViewerScreen';
@@ -123,6 +124,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Chat" component={ChatScreen} />
             <Stack.Screen name="Contacts" component={ContactsScreen} />
+            <Stack.Screen name="NewGroup" component={NewGroupScreen} />
             <Stack.Screen
               name="MomentComposer"
               component={MomentComposerScreen}

@@ -94,7 +94,7 @@ export async function loadAll(): Promise<LiveData | null> {
   try {
     const [profilesQ, membersQ, momentsQ, blocksQ] = await Promise.all([
       supabase.from('profiles').select('*').neq('id', uid),
-      supabase.from('chat_members').select('chat_id, user_id'),
+      supabase.from('chat_members').select('chat_id, user_id, role'),
       supabase.from('moments').select('*, moment_views(viewer_id)').gt('expires_at', new Date().toISOString()),
       supabase.from('blocks').select('blocked_id').eq('blocker_id', uid),
     ]);
@@ -110,12 +110,30 @@ export async function loadAll(): Promise<LiveData | null> {
       online: false,
     }));
 
-    // my chats → other member = contactId
+    // my chats: direct → other member = contactId; group/channel → name/icon/members
     const members = membersQ.data ?? [];
-    const myChats = new Set(members.filter((m: any) => m.user_id === uid).map((m: any) => m.chat_id));
-    const chats: Chat[] = members
-      .filter((m: any) => myChats.has(m.chat_id) && m.user_id !== uid)
-      .map((m: any) => ({ id: m.chat_id, contactId: m.user_id }));
+    const myChats = [...new Set(
+      members.filter((m: any) => m.user_id === uid).map((m: any) => m.chat_id as string)
+    )];
+    let chats: Chat[] = [];
+    if (myChats.length) {
+      const { data: chatRows } = await supabase
+        .from('chats').select('id, type, name, icon_emoji').in('id', myChats);
+      chats = (chatRows ?? []).map((c: any) => {
+        const chatMembers = members.filter((m: any) => m.chat_id === c.id);
+        const mine = chatMembers.find((m: any) => m.user_id === uid);
+        if (c.type === 'direct') {
+          const other = chatMembers.find((m: any) => m.user_id !== uid);
+          return { id: c.id, contactId: other?.user_id ?? '', kind: 'direct' as const };
+        }
+        return {
+          id: c.id, contactId: '', kind: c.type as 'group' | 'channel',
+          name: c.name ?? 'Group', iconEmoji: c.icon_emoji ?? '👥',
+          memberIds: chatMembers.map((m: any) => m.user_id),
+          myRole: (mine?.role ?? 'member') as Chat['myRole'],
+        };
+      });
+    }
 
     let messages: Message[] = [];
     if (chats.length) {
@@ -158,6 +176,20 @@ function toMessage(m: any, uid: string): Message {
 }
 
 // ---------- chat ops ----------
+export async function createGroupLive(
+  kind: 'group' | 'channel', name: string, icon: string, memberIds: string[]
+): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.rpc('create_group_chat', {
+    p_type: kind, p_name: name, p_icon: icon, p_member_ids: memberIds,
+  });
+  if (error) {
+    console.warn('[live] create_group_chat:', error.message);
+    return null;
+  }
+  return data as string;
+}
+
 export async function ensureDirectChat(otherUserId: string): Promise<string | null> {
   if (!supabase) return null;
   const { data, error } = await supabase.rpc('create_direct_chat', { p_other_user: otherUserId });

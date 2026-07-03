@@ -61,7 +61,18 @@ export default function ChatScreen({ navigation, route }: any) {
   const blocked = useAppStore((s) => s.blocked);
   const smartOn = useAppStore((s) => s.settings.smartReplies);
 
-  const contact = contacts.find((c) => c.id === chats.find((ch) => ch.id === chatId)?.contactId);
+  const chat = chats.find((ch) => ch.id === chatId);
+  const isGroup = chat?.kind === 'group' || chat?.kind === 'channel';
+  const readOnlyChannel = chat?.kind === 'channel' && chat?.myRole === 'member';
+  const contact = contacts.find((c) => c.id === chat?.contactId);
+  // group/channel chats render with their own identity instead of a contact
+  const display = contact ?? (isGroup
+    ? {
+        id: chat!.id, name: chat!.name ?? 'Group',
+        initials: chat!.iconEmoji ?? '👥',
+        gradient: gradients.avatar2, online: false,
+      }
+    : null);
   const messages = useMemo(
     () => allMessages.filter((m) => m.chatId === chatId).sort((a, b) => a.sentAt - b.sentAt),
     [allMessages, chatId]
@@ -78,11 +89,11 @@ export default function ChatScreen({ navigation, route }: any) {
     markChatRead(chatId);
   }, [chatId, messages.length]);
 
-  // Smart replies on the latest received message
+  // Smart replies on the latest received message (1:1 chats only)
   const lastMsg = messages[messages.length - 1];
   useEffect(() => {
     let alive = true;
-    if (smartOn && contact && lastMsg && lastMsg.senderId !== 'me') {
+    if (smartOn && contact && !isGroup && lastMsg && lastMsg.senderId !== 'me') {
       smartReplies.suggest(lastMsg.text, contact.name).then((r) => {
         if (alive) setChips(r);
       });
@@ -109,13 +120,13 @@ export default function ChatScreen({ navigation, route }: any) {
 
   const send = (text?: string) => {
     const t = (text ?? draft).trim();
-    if (!t || !contact) return;
+    if (!t || readOnlyChannel) return;
     sendMessage(chatId, t);
     setDraft('');
     setChips([]);
   };
 
-  if (!contact) return null;
+  if (!display) return null;
 
   return (
     <View style={styles.container}>
@@ -126,28 +137,36 @@ export default function ChatScreen({ navigation, route }: any) {
         <PressableScale onPress={() => navigation.goBack()} haptic={false} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.white} />
         </PressableScale>
-        <Avatar gradient={contact.gradient} label={contact.initials} size={40} online={contact.online} />
+        <Avatar gradient={display.gradient} label={display.initials} size={40} online={display.online} />
         <View style={{ flex: 1, marginLeft: 11 }}>
-          <Text style={styles.headerName}>{contact.name}</Text>
+          <Text style={styles.headerName}>{display.name}</Text>
           <Text style={[styles.headerStatus, typing && { color: colors.yellow }]}>
-            {isBlocked
+            {isGroup
+              ? chat?.kind === 'channel'
+                ? `channel · ${chat?.memberIds?.length ?? 1} subscribers`
+                : `${chat?.memberIds?.length ?? 1} members`
+              : isBlocked
               ? 'blocked'
               : typing
               ? 'typing…'
               : backendMode === 'demo'
-              ? contact.online ? 'online' : 'last seen recently'
+              ? contact?.online ? 'online' : 'last seen recently'
               : 'on Bazingga' /* live: honest until real presence ships */}
           </Text>
         </View>
-        <PressableScale haptic={false} style={styles.headerBtn} onPress={() => startCall(contact.id, true)}>
-          <Ionicons name="videocam-outline" size={22} color={colors.textSecondary} />
-        </PressableScale>
-        <PressableScale haptic={false} style={styles.headerBtn} onPress={() => startCall(contact.id, false)}>
-          <Ionicons name="call-outline" size={20} color={colors.textSecondary} />
-        </PressableScale>
-        <PressableScale haptic={false} style={styles.headerBtn} onPress={() => setMenuOpen(true)}>
-          <Ionicons name="ellipsis-vertical" size={18} color={colors.textSecondary} />
-        </PressableScale>
+        {!isGroup && contact && (
+          <>
+            <PressableScale haptic={false} style={styles.headerBtn} onPress={() => startCall(contact.id, true)}>
+              <Ionicons name="videocam-outline" size={22} color={colors.textSecondary} />
+            </PressableScale>
+            <PressableScale haptic={false} style={styles.headerBtn} onPress={() => startCall(contact.id, false)}>
+              <Ionicons name="call-outline" size={20} color={colors.textSecondary} />
+            </PressableScale>
+            <PressableScale haptic={false} style={styles.headerBtn} onPress={() => setMenuOpen(true)}>
+              <Ionicons name="ellipsis-vertical" size={18} color={colors.textSecondary} />
+            </PressableScale>
+          </>
+        )}
       </Animated.View>
 
       {/* Messages */}
@@ -198,6 +217,11 @@ export default function ChatScreen({ navigation, route }: any) {
                 </PressableScale>
               ) : (
                 <View style={[styles.bubble, styles.bubbleTheirs]}>
+                  {isGroup && (
+                    <Text style={styles.senderName}>
+                      {contacts.find((c) => c.id === m.senderId)?.name ?? 'Member'}
+                    </Text>
+                  )}
                   <Text style={styles.msgText}>{m.text}</Text>
                   <View style={styles.metaRow}>
                     <Text style={styles.metaText}>{timeStr(m.sentAt)}</Text>
@@ -232,9 +256,13 @@ export default function ChatScreen({ navigation, route }: any) {
 
       {/* Input bar */}
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        {isBlocked ? (
+        {readOnlyChannel ? (
           <View style={styles.blockedBar}>
-            <Text style={styles.blockedText}>You blocked {contact.name}.</Text>
+            <Text style={styles.blockedText}>Only admins can post in this channel.</Text>
+          </View>
+        ) : isBlocked ? (
+          <View style={styles.blockedBar}>
+            <Text style={styles.blockedText}>You blocked {display.name}.</Text>
           </View>
         ) : (
           <View style={styles.inputBar}>
@@ -264,7 +292,8 @@ export default function ChatScreen({ navigation, route }: any) {
         )}
       </KeyboardAvoidingView>
 
-      {/* Chat menu: block / report */}
+      {/* Chat menu: block / report (1:1 chats) */}
+      {contact && (
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
         <PressableScale haptic={false} style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
           <Animated.View entering={ZoomIn.duration(180)} style={styles.menu}>
@@ -295,6 +324,7 @@ export default function ChatScreen({ navigation, route }: any) {
           </Animated.View>
         </PressableScale>
       </Modal>
+      )}
 
       {toast ? (
         <Animated.View entering={FadeInUp.springify()} style={styles.toast}>
@@ -331,6 +361,7 @@ const styles = StyleSheet.create({
   },
   typingBubble: { paddingVertical: 12, paddingHorizontal: 18 },
   msgText: { color: colors.white, fontSize: 15.5, fontFamily: fonts.regular, lineHeight: 21 },
+  senderName: { color: colors.yellow, fontSize: 12, fontFamily: fonts.semiBold, marginBottom: 2 },
   metaRow: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     alignSelf: 'flex-end', marginTop: 3,

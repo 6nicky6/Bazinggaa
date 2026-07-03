@@ -40,8 +40,16 @@ export default function ChatListScreen({ navigation }: any) {
   const rows = useMemo(() => {
     return chats
       .map((chat) => {
-        const contact = contacts.find((c) => c.id === chat.contactId);
-        if (!contact || blocked.includes(contact.id)) return null;
+        let contact = contacts.find((c) => c.id === chat.contactId);
+        if (chat.kind === 'group' || chat.kind === 'channel') {
+          // groups/channels render with their own identity
+          contact = {
+            id: chat.id, name: chat.name ?? 'Group', username: '',
+            status: '', gradient: gradients.avatar2,
+            initials: chat.iconEmoji ?? '👥', group: 'Friends', online: false,
+          };
+        }
+        if (!contact || blocked.includes(chat.contactId)) return null;
         const msgs = messages.filter((m) => m.chatId === chat.id);
         const last = msgs[msgs.length - 1];
         const unread = msgs.filter(
