@@ -19,7 +19,13 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.nicky.bazingga",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -27,6 +33,12 @@
     "plugins": [
       "expo-font",
       "expo-audio"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8d1d2119-2ff0-48fa-95cf-4b6fff7c578e"
+      }
+    },
+    "owner": "nickysteam"
   }
 }
