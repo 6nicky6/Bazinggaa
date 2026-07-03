@@ -25,7 +25,14 @@ export default function PhoneScreen({ navigation, route }: any) {
     ? /^\S+@\S+\.\S+$/.test(email.trim())
     : phone.replace(/\D/g, '').length >= 7;
 
+  // SMS needs Twilio (not configured yet) — in live mode steer phone users to email
+  const phoneUnavailable = !isEmail && backendMode === 'live';
+
   const submit = async () => {
+    if (phoneUnavailable) {
+      navigation.replace('Phone', { mode: 'email' });
+      return;
+    }
     if (!valid || sending) return;
     const target = isEmail
       ? { email: email.trim().toLowerCase() }
@@ -65,7 +72,7 @@ export default function PhoneScreen({ navigation, route }: any) {
             ? `Demo mode: any ${isEmail ? 'email' : 'number'} works for now.`
             : isEmail
             ? 'Check your inbox (and spam) for the code.'
-            : 'Standard SMS rates may apply.'}
+            : 'SMS login is coming soon — use Email for now.'}
         </Animated.Text>
 
         <Animated.View entering={FadeInDown.delay(240).duration(500)} style={styles.inputRow}>
@@ -107,8 +114,8 @@ export default function PhoneScreen({ navigation, route }: any) {
         {!!error && <Text style={styles.error}>{error}</Text>}
         <PressableScale
           onPress={submit}
-          style={[styles.cta, (!valid || sending) && { opacity: 0.4 }]}
-          disabled={!valid || sending}
+          style={[styles.cta, !phoneUnavailable && (!valid || sending) && { opacity: 0.4 }]}
+          disabled={!phoneUnavailable && (!valid || sending)}
         >
           <LinearGradient
             colors={gradients.primary}
@@ -116,7 +123,9 @@ export default function PhoneScreen({ navigation, route }: any) {
             end={{ x: 1, y: 1 }}
             style={styles.ctaInner}
           >
-            <Text style={styles.ctaText}>{sending ? 'Sending…' : 'Send Code'}</Text>
+            <Text style={styles.ctaText}>
+              {phoneUnavailable ? 'Use Email Instead' : sending ? 'Sending…' : 'Send Code'}
+            </Text>
             <Ionicons name="arrow-forward" size={18} color={colors.white} />
           </LinearGradient>
         </PressableScale>
