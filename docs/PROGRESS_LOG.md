@@ -1,5 +1,10 @@
 # Bazingga Progress Log
 
+### 2026-07-03 (evening) — V1.1: bot, calls, groups, channels + audit fixes → APK #2
+- Did: ALL QA-audit launch blockers fixed (Report wired to DB, Resend w/ cooldown, failed-msg retry, honest presence/ticks, privacy policy screen linked login+profile, timestamp + reply-storm bugs). NEW: BazinggaBot (Gemini AI contact, memory + typing), full calls mechanism (CallOverlay, realtime signaling, incoming-call UI, call log), Groups + Channels (create flow, sender names, admin-only channel posting), private discovery (@username search, no userbase browsing). Schema v3 written (docs/SCHEMA_V3.sql). APK #2 built: https://expo.dev/artifacts/eas/RDWt1CdZ9zeHKNL1AAQdBM1z85MFkm8es23f8W8wlEY.apk
+- Broke: Nothing; tsc + browser-verified. Supabase dashboard outage blocks running SCHEMA_V3 on live (monitor armed — run it when their status clears; includes test-data sweep). Live groups/calls need that SQL; everything else live now.
+- Next: schema v3 on live → two-phone test (chat, bot, group, call ring) → Phase C (Play Store) + Phase D (content).
+
 > 3 lines after every sprint. Newest first.
 
 ## Status Snapshot
