@@ -42,3 +42,6 @@ yarn-error.*
 
 # never commit real keys
 .env
+
+# persistent QA test accounts (sessions + inbox creds)
+.test-accounts.json
