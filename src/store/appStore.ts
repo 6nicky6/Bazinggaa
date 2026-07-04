@@ -17,6 +17,7 @@ const isLive = backendMode === 'live';
 let idc = 0;
 const uid = () => `${Date.now().toString(36)}-${(idc++).toString(36)}`;
 let liveUnsub: (() => void) | null = null;
+let lastLiveRefresh = 0;
 
 type State = {
   hydrated: boolean;
@@ -330,6 +331,29 @@ export const useAppStore = create<State>()(
                 ? st // already have it (own optimistic replaced by server copy)
                 : { messages: [...st.messages, m] }
             );
+            // Message for a chat we don't know yet (someone just started it)?
+            // Refresh chats + contacts so the conversation appears instantly.
+            const st = get();
+            if (!st.chats.some((c) => c.id === m.chatId)) {
+              const now = Date.now();
+              if (now - lastLiveRefresh > 4000) {
+                lastLiveRefresh = now;
+                live.loadAll().then((d) => {
+                  if (!d) return;
+                  set((s2) => ({
+                    contacts: [BOT_CONTACT, ...d.contacts],
+                    chats: [
+                      ...s2.chats.filter((c) => c.id === BOT_ID),
+                      ...d.chats,
+                    ],
+                    messages: [
+                      ...d.messages,
+                      ...s2.messages.filter((x) => x.chatId === BOT_ID),
+                    ],
+                  }));
+                });
+              }
+            }
           },
           onMomentChange: () => {
             live.loadAll().then((d) => d && set({ moments: d.moments }));

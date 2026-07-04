@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, View,
+  FlatList, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -86,7 +86,47 @@ export default function ChatScreen({ navigation, route }: any) {
   const [toast, setToast] = useState('');
   const [attachOpen, setAttachOpen] = useState(false);
   const [recording, setRecording] = useState(false);
+  const [recLocked, setRecLocked] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
+  const recLockedRef = React.useRef(false);
+
+  // WhatsApp-style mic: hold = record, slide up = lock (keep recording hands-free)
+  const micPan = React.useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => !draft.trim(),
+        onPanResponderGrant: () => {
+          recLockedRef.current = false;
+          setRecLocked(false);
+          setRecSecs(0);
+          setRecording(true);
+        },
+        onPanResponderMove: (_e, g) => {
+          if (g.dy < -45 && !recLockedRef.current) {
+            recLockedRef.current = true;
+            setRecLocked(true);
+          }
+        },
+        onPanResponderRelease: () => {
+          if (!recLockedRef.current) {
+            setRecording(false);
+            showToast('Voice messages arrive in the next update ⚡');
+          }
+          // locked: keep recording until Cancel/Send tapped
+        },
+        onPanResponderTerminate: () => {
+          if (!recLockedRef.current) setRecording(false);
+        },
+      }),
+    [draft]
+  );
+
+  const stopRecording = (send: boolean) => {
+    setRecording(false);
+    setRecLocked(false);
+    recLockedRef.current = false;
+    if (send) showToast('Voice messages arrive in the next update ⚡');
+  };
   const sendImage = useAppStore((s) => s.sendImage);
 
   const showToast = (msg: string) => {
@@ -299,9 +339,16 @@ export default function ChatScreen({ navigation, route }: any) {
               <View style={[styles.input, styles.recordingBar]}>
                 <View style={styles.recDot} />
                 <Text style={styles.recText}>
-                  Recording… 0:{String(recSecs).padStart(2, '0')}
+                  {recLocked ? '🔒 ' : ''}Recording… 0:{String(recSecs).padStart(2, '0')}
                 </Text>
-                <Text style={styles.recHint}>release to finish</Text>
+                {recLocked ? (
+                  <View style={{ flexDirection: 'row', gap: 14, marginLeft: 'auto' }}>
+                    <Text style={styles.recCancel} onPress={() => stopRecording(false)}>Cancel</Text>
+                    <Text style={styles.recSend} onPress={() => stopRecording(true)}>Send</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.recHint}>⬆ slide up to lock</Text>
+                )}
               </View>
             ) : (
               <TextInput
@@ -314,32 +361,29 @@ export default function ChatScreen({ navigation, route }: any) {
                 onSubmitEditing={() => send()}
               />
             )}
-            <PressableScale
-              onPress={() => draft.trim() && send()}
-              onLongPress={() => {
-                if (!draft.trim()) {
-                  setRecSecs(0);
-                  setRecording(true);
-                }
-              }}
-              onPressOut={() => {
-                if (recording) {
-                  setRecording(false);
-                  showToast('Voice messages arrive in the next update ⚡');
-                }
-              }}
-              scaleTo={0.85}
-              style={styles.sendWrap}
-            >
-              <LinearGradient
-                colors={recording ? ([colors.red, colors.redHot] as const) : gradients.primary}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.sendBtn}
-              >
-                <Ionicons name={draft.trim() ? 'send' : 'mic'} size={18} color={colors.white} />
-              </LinearGradient>
-            </PressableScale>
+            {draft.trim() ? (
+              <PressableScale onPress={() => send()} scaleTo={0.85} style={styles.sendWrap}>
+                <LinearGradient
+                  colors={gradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.sendBtn}
+                >
+                  <Ionicons name="send" size={18} color={colors.white} />
+                </LinearGradient>
+              </PressableScale>
+            ) : (
+              <View style={styles.sendWrap} {...micPan.panHandlers}>
+                <LinearGradient
+                  colors={recording ? ([colors.red, colors.redHot] as const) : gradients.primary}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={[styles.sendBtn, recording && !recLocked && { transform: [{ scale: 1.25 }] }]}
+                >
+                  <Ionicons name="mic" size={18} color={colors.white} />
+                </LinearGradient>
+              </View>
+            )}
           </View>
         )}
       </KeyboardAvoidingView>
@@ -485,4 +529,6 @@ const styles = StyleSheet.create({
   recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red },
   recText: { color: colors.white, fontSize: 14.5, fontFamily: fonts.semiBold },
   recHint: { color: colors.textTertiary, fontSize: 12, fontFamily: fonts.regular, marginLeft: 'auto' },
+  recCancel: { color: colors.textSecondary, fontSize: 13.5, fontFamily: fonts.semiBold },
+  recSend: { color: colors.yellow, fontSize: 13.5, fontFamily: fonts.semiBold },
 });
