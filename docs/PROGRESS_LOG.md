@@ -1,5 +1,10 @@
 # Bazingga Progress Log
 
+### 2026-07-04 — V1.2 Full Polish → APK #3
+- Did: OTP keyboard fix (input overlays boxes), removed stale phone-login block + invite-only beta card with switch-to-email, Invite Friends share row, group-creation error states, media system (AttachSheet: photos+camera WORK on-device; voice/doc/location/sticker as next-update states), image bubbles + 📷 previews, hold-to-record voice UI. Browser-verified end to end. APK #3: https://expo.dev/artifacts/eas/vNlqELTWEwvWW013QH_zQ7LMSq_01-yZ6SjzcjwnAL0.apk
+- Broke: Nothing (tsc clean). Supabase outage STILL blocking SCHEMA_V3 (live groups/calls); watcher armed. Continuation chat chip created for session 2.
+- Next: Nikhil retests APK #3 (esp. new-user email login on 2nd phone); schema v3 on recovery; whitelist Neha's number in Twilio; Brevo SMTP; Phase C/D.
+
 ### 2026-07-03 (evening) — V1.1: bot, calls, groups, channels + audit fixes → APK #2
 - Did: ALL QA-audit launch blockers fixed (Report wired to DB, Resend w/ cooldown, failed-msg retry, honest presence/ticks, privacy policy screen linked login+profile, timestamp + reply-storm bugs). NEW: BazinggaBot (Gemini AI contact, memory + typing), full calls mechanism (CallOverlay, realtime signaling, incoming-call UI, call log), Groups + Channels (create flow, sender names, admin-only channel posting), private discovery (@username search, no userbase browsing). Schema v3 written (docs/SCHEMA_V3.sql). APK #2 built: https://expo.dev/artifacts/eas/RDWt1CdZ9zeHKNL1AAQdBM1z85MFkm8es23f8W8wlEY.apk
 - Broke: Nothing; tsc + browser-verified. Supabase dashboard outage blocks running SCHEMA_V3 on live (monitor armed — run it when their status clears; includes test-data sweep). Live groups/calls need that SQL; everything else live now.
