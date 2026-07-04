@@ -23,6 +23,7 @@ export default function NewGroupScreen({ navigation, route }: any) {
   const [icon, setIcon] = useState(kind === 'channel' ? '📢' : '👥');
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
 
   const pickable = contacts.filter((c) => c.id !== BOT_ID && !blocked.includes(c.id));
   const valid = name.trim().length >= 2 && selected.length >= 1;
@@ -33,9 +34,16 @@ export default function NewGroupScreen({ navigation, route }: any) {
   const create = async () => {
     if (!valid || busy) return;
     setBusy(true);
+    setError('');
     const chatId = await createGroup(kind, name.trim(), icon, selected);
     setBusy(false);
-    if (chatId) navigation.replace('Chat', { chatId });
+    if (chatId) {
+      navigation.replace('Chat', { chatId });
+    } else {
+      setError(
+        `Couldn't create the ${kind} — our servers are being upgraded right now. Try again in a little while.`
+      );
+    }
   };
 
   return (
@@ -104,6 +112,7 @@ export default function NewGroupScreen({ navigation, route }: any) {
       />
 
       <View style={styles.footer}>
+        {!!error && <Text style={styles.errorText}>{error}</Text>}
         <PressableScale onPress={create} style={[styles.cta, (!valid || busy) && { opacity: 0.4 }]} disabled={!valid || busy}>
           <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaInner}>
             <Text style={styles.ctaText}>
@@ -119,6 +128,10 @@ export default function NewGroupScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.black, paddingTop: 52 },
+  errorText: {
+    color: colors.redHot, fontSize: 13, fontFamily: fonts.medium,
+    textAlign: 'center', marginBottom: 10, paddingHorizontal: 10,
+  },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, marginBottom: 8 },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: colors.white, fontSize: 22, fontFamily: fonts.display, marginLeft: 4 },

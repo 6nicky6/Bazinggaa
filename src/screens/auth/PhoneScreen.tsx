@@ -25,14 +25,9 @@ export default function PhoneScreen({ navigation, route }: any) {
     ? /^\S+@\S+\.\S+$/.test(email.trim())
     : phone.replace(/\D/g, '').length >= 7;
 
-  // SMS needs Twilio (not configured yet) — in live mode steer phone users to email
-  const phoneUnavailable = !isEmail && backendMode === 'live';
+  const [betaBlocked, setBetaBlocked] = useState(false);
 
   const submit = async () => {
-    if (phoneUnavailable) {
-      navigation.replace('Phone', { mode: 'email' });
-      return;
-    }
     if (!valid || sending) return;
     const target = isEmail
       ? { email: email.trim().toLowerCase() }
@@ -40,10 +35,16 @@ export default function PhoneScreen({ navigation, route }: any) {
     if (backendMode === 'live') {
       setSending(true);
       setError('');
+      setBetaBlocked(false);
       const res = await sendOtp(target);
       setSending(false);
       if (!res.ok) {
-        setError(res.error ?? 'Could not send code. Try again.');
+        // Twilio trial can only text invited (verified) numbers
+        if (!isEmail && /21608|unverified|not.*verified|Invalid parameter/i.test(res.error ?? '')) {
+          setBetaBlocked(true);
+        } else {
+          setError(res.error ?? 'Could not send code. Try again.');
+        }
         return;
       }
     }
@@ -112,22 +113,51 @@ export default function PhoneScreen({ navigation, route }: any) {
 
       <Animated.View entering={FadeInUp.delay(300).duration(500)} style={styles.footer}>
         {!!error && <Text style={styles.error}>{error}</Text>}
+        {betaBlocked && (
+          <View style={styles.betaCard}>
+            <Ionicons name="sparkles" size={16} color={colors.yellow} />
+            <Text style={styles.betaText}>
+              SMS login is invite-only while Bazingga is in beta. Use email —
+              it's instant and free — or ask your inviter to whitelist this number.
+            </Text>
+          </View>
+        )}
+        {betaBlocked && (
+          <PressableScale
+            onPress={() => navigation.replace('Phone', { mode: 'email' })}
+            style={[styles.cta, { marginBottom: 10 }]}
+          >
+            <LinearGradient
+              colors={gradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.ctaInner}
+            >
+              <Text style={styles.ctaText}>Continue with Email</Text>
+              <Ionicons name="mail" size={17} color={colors.white} />
+            </LinearGradient>
+          </PressableScale>
+        )}
         <PressableScale
           onPress={submit}
-          style={[styles.cta, !phoneUnavailable && (!valid || sending) && { opacity: 0.4 }]}
-          disabled={!phoneUnavailable && (!valid || sending)}
+          style={[styles.cta, (!valid || sending) && { opacity: 0.4 }, betaBlocked && styles.ctaSecondary]}
+          disabled={!valid || sending}
         >
-          <LinearGradient
-            colors={gradients.primary}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.ctaInner}
-          >
-            <Text style={styles.ctaText}>
-              {phoneUnavailable ? 'Use Email Instead' : sending ? 'Sending…' : 'Send Code'}
-            </Text>
-            <Ionicons name="arrow-forward" size={18} color={colors.white} />
-          </LinearGradient>
+          {betaBlocked ? (
+            <View style={[styles.ctaInner, styles.ctaSecondaryInner]}>
+              <Text style={styles.ctaText}>{sending ? 'Sending…' : 'Try SMS Again'}</Text>
+            </View>
+          ) : (
+            <LinearGradient
+              colors={gradients.primary}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.ctaInner}
+            >
+              <Text style={styles.ctaText}>{sending ? 'Sending…' : 'Send Code'}</Text>
+              <Ionicons name="arrow-forward" size={18} color={colors.white} />
+            </LinearGradient>
+          )}
         </PressableScale>
       </Animated.View>
     </KeyboardAvoidingView>
@@ -136,6 +166,16 @@ export default function PhoneScreen({ navigation, route }: any) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.black },
+  betaCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: 'rgba(246,184,0,0.08)', borderWidth: 1, borderColor: 'rgba(246,184,0,0.25)',
+    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 12,
+  },
+  betaText: { color: colors.textSecondary, fontSize: 12.5, fontFamily: fonts.regular, flexShrink: 1, lineHeight: 18 },
+  ctaSecondary: { shadowOpacity: 0, elevation: 0 },
+  ctaSecondaryInner: {
+    backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder, borderRadius: 30,
+  },
   body: { flex: 1, paddingHorizontal: 26, paddingTop: 56 },
   back: {
     width: 40, height: 40, borderRadius: 20,

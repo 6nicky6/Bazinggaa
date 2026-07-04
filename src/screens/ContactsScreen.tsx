@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { FlatList, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import GlowBackground from '../components/GlowBackground';
@@ -81,6 +81,35 @@ export default function ContactsScreen({ navigation }: any) {
         </PressableScale>
       </View>
 
+      {/* Invite friends — WhatsApp-style share via SMS/WhatsApp/anything */}
+      <PressableScale
+        haptic={false}
+        style={styles.inviteRow}
+        onPress={() =>
+          Share.share({
+            message:
+              "Join me on Bazingga — the new messenger with an AI sidekick ⚡ Fast. Private. Expressive.\n\nGet it here: https://github.com/6nicky6/Bazinggaa/releases (Play Store coming soon!)",
+          }).catch(() => {})
+        }
+      >
+        <View style={styles.inviteIcon}>
+          <Ionicons name="person-add" size={18} color={colors.yellow} />
+        </View>
+        <View style={{ flex: 1, marginLeft: 13 }}>
+          <Text style={styles.name}>Invite friends to Bazingga</Text>
+          <Text style={styles.status}>Share via SMS, WhatsApp, or anywhere</Text>
+        </View>
+        <Ionicons name="share-social-outline" size={19} color={colors.textSecondary} />
+      </PressableScale>
+
+      {isLive && q.trim().length >= 2 && list.length === 0 && (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyText}>
+            Nobody found for "{q.trim()}". They may not be on Bazingga yet — invite them! ⚡
+          </Text>
+        </View>
+      )}
+
       <FlatList
         data={list}
         keyExtractor={(c) => c.id}
@@ -135,4 +164,17 @@ const styles = StyleSheet.create({
     borderRadius: 16, paddingVertical: 12, justifyContent: 'center',
   },
   quickText: { color: colors.white, fontSize: 13.5, fontFamily: fonts.semiBold },
+  inviteRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+    marginBottom: 4,
+  },
+  inviteIcon: {
+    width: 50, height: 50, borderRadius: 25,
+    backgroundColor: 'rgba(246,184,0,0.1)', borderWidth: 1, borderColor: 'rgba(246,184,0,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emptyBox: { paddingHorizontal: 24, paddingVertical: 16 },
+  emptyText: { color: colors.textTertiary, fontSize: 13.5, fontFamily: fonts.regular, lineHeight: 20 },
 });

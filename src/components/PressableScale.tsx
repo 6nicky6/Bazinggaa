@@ -23,6 +23,7 @@ export default function PressableScale({
   haptic = true,
   scaleTo = 0.96,
   onPressIn,
+  onPressOut,
   onPress,
   ...rest
 }: Props) {
@@ -42,8 +43,9 @@ export default function PressableScale({
         }
         onPressIn?.(e);
       }}
-      onPressOut={() => {
+      onPressOut={(e) => {
         scale.value = withSpring(1, { damping: 12, stiffness: 250 });
+        onPressOut?.(e);
       }}
       onPress={onPress}
     >

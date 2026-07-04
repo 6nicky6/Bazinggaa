@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, View,
+  FlatList, Image, KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,6 +8,7 @@ import Animated, {
   FadeIn, FadeInDown, FadeInUp, ZoomIn,
 } from 'react-native-reanimated';
 import GlowBackground from '../components/GlowBackground';
+import AttachSheet from '../components/AttachSheet';
 import PressableScale from '../components/PressableScale';
 import Avatar from '../components/Avatar';
 import { colors, gradients } from '../theme/colors';
@@ -83,6 +84,22 @@ export default function ChatScreen({ navigation, route }: any) {
   const [chips, setChips] = useState<string[]>([]);
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState('');
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recSecs, setRecSecs] = useState(0);
+  const sendImage = useAppStore((s) => s.sendImage);
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2600);
+  };
+
+  // voice hold-to-record UI (audio capture ships next update)
+  useEffect(() => {
+    if (!recording) return;
+    const t = setInterval(() => setRecSecs((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [recording]);
   const listRef = useRef<FlatList>(null);
 
   useEffect(() => {
@@ -205,7 +222,16 @@ export default function ChatScreen({ navigation, route }: any) {
                     end={{ x: 1, y: 1 }}
                     style={[styles.bubble, styles.bubbleMine, { maxWidth: '100%' }, m.status === 'failed' && { opacity: 0.7 }]}
                   >
-                    <Text style={styles.msgText}>{m.text}</Text>
+                    {m.imageUri ? (
+                      <>
+                        <Image source={{ uri: m.imageUri }} style={styles.msgImage} resizeMode="cover" />
+                        {backendMode === 'live' && (
+                          <Text style={styles.imageNote}>On your device · photo sync ships next update</Text>
+                        )}
+                      </>
+                    ) : (
+                      <Text style={styles.msgText}>{m.text}</Text>
+                    )}
                     <View style={styles.metaRow}>
                       {m.status === 'failed' && (
                         <Text style={[styles.metaText, { color: colors.yellow }]}>Not sent · tap to retry</Text>
@@ -266,21 +292,47 @@ export default function ChatScreen({ navigation, route }: any) {
           </View>
         ) : (
           <View style={styles.inputBar}>
-            <PressableScale haptic={false} style={styles.inputIcon}>
+            <PressableScale haptic={false} style={styles.inputIcon} onPress={() => setAttachOpen(true)}>
               <Ionicons name="add" size={24} color={colors.textSecondary} />
             </PressableScale>
-            <TextInput
-              style={styles.input}
-              value={draft}
-              onChangeText={setDraft}
-              placeholder="Message"
-              placeholderTextColor={colors.textTertiary}
-              multiline
-              onSubmitEditing={() => send()}
-            />
-            <PressableScale onPress={() => send()} scaleTo={0.85} style={styles.sendWrap}>
+            {recording ? (
+              <View style={[styles.input, styles.recordingBar]}>
+                <View style={styles.recDot} />
+                <Text style={styles.recText}>
+                  Recording… 0:{String(recSecs).padStart(2, '0')}
+                </Text>
+                <Text style={styles.recHint}>release to finish</Text>
+              </View>
+            ) : (
+              <TextInput
+                style={styles.input}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder="Message"
+                placeholderTextColor={colors.textTertiary}
+                multiline
+                onSubmitEditing={() => send()}
+              />
+            )}
+            <PressableScale
+              onPress={() => draft.trim() && send()}
+              onLongPress={() => {
+                if (!draft.trim()) {
+                  setRecSecs(0);
+                  setRecording(true);
+                }
+              }}
+              onPressOut={() => {
+                if (recording) {
+                  setRecording(false);
+                  showToast('Voice messages arrive in the next update ⚡');
+                }
+              }}
+              scaleTo={0.85}
+              style={styles.sendWrap}
+            >
               <LinearGradient
-                colors={gradients.primary}
+                colors={recording ? ([colors.red, colors.redHot] as const) : gradients.primary}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.sendBtn}
@@ -291,6 +343,13 @@ export default function ChatScreen({ navigation, route }: any) {
           </View>
         )}
       </KeyboardAvoidingView>
+
+      <AttachSheet
+        visible={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        onImage={(uri) => sendImage(chatId, uri)}
+        onComingSoon={(f) => showToast(`${f} arrive in the next update ⚡`)}
+      />
 
       {/* Chat menu: block / report (1:1 chats) */}
       {contact && (
@@ -417,4 +476,13 @@ const styles = StyleSheet.create({
     borderRadius: 22, paddingHorizontal: 16, paddingVertical: 11, maxWidth: '86%',
   },
   toastText: { color: colors.white, fontSize: 13, fontFamily: fonts.medium, flexShrink: 1 },
+  msgImage: { width: 220, height: 220, borderRadius: 14, marginBottom: 4 },
+  imageNote: { color: 'rgba(255,255,255,0.65)', fontSize: 10.5, fontFamily: fonts.regular, marginBottom: 2 },
+  recordingBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 13,
+  },
+  recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red },
+  recText: { color: colors.white, fontSize: 14.5, fontFamily: fonts.semiBold },
+  recHint: { color: colors.textTertiary, fontSize: 12, fontFamily: fonts.regular, marginLeft: 'auto' },
 });

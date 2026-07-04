@@ -230,7 +230,8 @@ export default function ChatListScreen({ navigation }: any) {
                   ) : (
                     <Text style={styles.preview} numberOfLines={1}>
                       {item.last
-                        ? (item.last.senderId === 'me' ? 'You: ' : '') + item.last.text
+                        ? (item.last.senderId === 'me' ? 'You: ' : '') +
+                          (item.last.imageUri ? '📷 Photo' : item.last.text)
                         : 'Say hi 👋'}
                     </Text>
                   )}

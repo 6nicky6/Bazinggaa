@@ -23,6 +23,12 @@ export default function OtpScreen({ navigation, route }: any) {
   const [resendIn, setResendIn] = useState(30);
   const inputRef = useRef<TextInput>(null);
 
+  // Android: focus after the screen transition settles so the keyboard opens
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 450);
+    return () => clearTimeout(t);
+  }, []);
+
   // resend cooldown ticker
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -82,11 +88,9 @@ export default function OtpScreen({ navigation, route }: any) {
           {backendMode === 'demo' ? '\nDemo mode: type any 6 digits.' : ''}
         </Animated.Text>
 
-        <PressableScale
-          onPress={() => inputRef.current?.focus()}
-          haptic={false}
-          style={styles.boxes}
-        >
+        {/* The input OVERLAYS the boxes so a tap lands directly on it —
+            programmatic .focus() alone doesn't open the Android keyboard. */}
+        <View style={styles.boxes}>
           {Array.from({ length: LEN }).map((_, i) => {
             const filled = i < digits.length;
             const activeBox = i === digits.length;
@@ -107,7 +111,19 @@ export default function OtpScreen({ navigation, route }: any) {
               </View>
             );
           })}
-        </PressableScale>
+          <TextInput
+            ref={inputRef}
+            style={styles.overlayInput}
+            value={digits}
+            onChangeText={(t) => setDigits(t.replace(/\D/g, '').slice(0, LEN))}
+            keyboardType="number-pad"
+            maxLength={LEN}
+            autoFocus
+            caretHidden
+            autoComplete="one-time-code"
+            textContentType="oneTimeCode"
+          />
+        </View>
 
         {verified && (
           <Animated.View entering={ZoomIn.springify()} style={styles.verifiedRow}>
@@ -120,16 +136,6 @@ export default function OtpScreen({ navigation, route }: any) {
             {error}
           </Animated.Text>
         )}
-
-        <TextInput
-          ref={inputRef}
-          style={styles.hiddenInput}
-          value={digits}
-          onChangeText={(t) => setDigits(t.replace(/\D/g, '').slice(0, LEN))}
-          keyboardType="number-pad"
-          maxLength={LEN}
-          autoFocus
-        />
 
         <PressableScale
           haptic={false}
@@ -170,14 +176,20 @@ const styles = StyleSheet.create({
     color: colors.textSecondary, fontSize: 14.5, fontFamily: fonts.regular,
     lineHeight: 21, marginTop: 10, marginBottom: 34,
   },
-  boxes: { flexDirection: 'row', gap: 9, justifyContent: 'center' },
+  boxes: { flexDirection: 'row', gap: 9, justifyContent: 'center', position: 'relative' },
+  overlayInput: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    opacity: 0.02, // must stay touchable+focusable; 0 gets culled on some Androids
+    color: 'transparent',
+    fontSize: 1,
+  },
   box: {
     flex: 1, maxWidth: 54, height: 60, borderRadius: 14,
     backgroundColor: colors.glass, borderWidth: 1.5, borderColor: colors.glassBorder,
     alignItems: 'center', justifyContent: 'center',
   },
   digit: { color: colors.white, fontSize: 24, fontFamily: fonts.bold },
-  hiddenInput: { position: 'absolute', opacity: 0, height: 1, width: 1 },
   verifiedRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, marginTop: 22,

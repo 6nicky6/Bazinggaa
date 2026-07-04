@@ -40,6 +40,7 @@ type State = {
   signOut: () => void;
   sendMessage: (chatId: string, text: string) => void;
   retryMessage: (messageId: string) => void;
+  sendImage: (chatId: string, imageUri: string) => void;
   activeCall: CallState | null;
   startCall: (contactId: string, video: boolean) => void;
   answerCall: (accept: boolean) => void;
@@ -213,6 +214,26 @@ export const useAppStore = create<State>()(
         } else {
           scheduleAutoReply(chatId, text);
         }
+      },
+
+      sendImage: (chatId, imageUri) => {
+        const msg: Message = {
+          id: uid(), chatId, senderId: 'me', text: '', imageUri,
+          sentAt: Date.now(), status: 'sent',
+        };
+        set((st) => ({ messages: [...st.messages, msg] }));
+        if (chatId === BOT_ID) {
+          setTimeout(() => set((st) => ({
+            messages: [...st.messages, {
+              id: uid(), chatId, senderId: BOT_ID,
+              text: "Nice shot! 📸 I can't see images yet — my vision upgrade lands soon. Describe it to me?",
+              sentAt: Date.now(), status: 'read' as const,
+            }],
+          })), 1200);
+        } else if (!isLive) {
+          scheduleAutoReply(chatId, 'sent you a photo 📸');
+        }
+        // live: image stays on-device until media sync ships (bubble shows a note)
       },
 
       retryMessage: (messageId: string) => {
