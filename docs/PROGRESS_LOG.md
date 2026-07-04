@@ -1,5 +1,10 @@
 # Bazingga Progress Log
 
+### 2026-07-04 (later) — APK #4: OTP length fix + OTA updates
+- Did: OTP screen adapts to code length (email 8 / SMS+demo 6 — root cause of "8-digit code, 6 boxes"); EAS Update (expo-updates) configured — JS fixes now ship over-the-air, no more reinstalls. APK #4: https://expo.dev/artifacts/eas/UbkKNgWsdQZwpfjXgsngMTsNC2hBWe-FlX-LH88Xf_I.apk
+- Broke: Nothing. Still pending: SCHEMA_V3 on Supabase recovery; set email OTP length to 6 in dashboard then; whitelist Neha's number in Twilio.
+- Next: Nikhil fresh-user test on 2nd phone -> first real two-phone chat; future fixes go via eas update (channel: preview).
+
 ### 2026-07-04 — V1.2 Full Polish → APK #3
 - Did: OTP keyboard fix (input overlays boxes), removed stale phone-login block + invite-only beta card with switch-to-email, Invite Friends share row, group-creation error states, media system (AttachSheet: photos+camera WORK on-device; voice/doc/location/sticker as next-update states), image bubbles + 📷 previews, hold-to-record voice UI. Browser-verified end to end. APK #3: https://expo.dev/artifacts/eas/vNlqELTWEwvWW013QH_zQ7LMSq_01-yZ6SjzcjwnAL0.apk
 - Broke: Nothing (tsc clean). Supabase outage STILL blocking SCHEMA_V3 (live groups/calls); watcher armed. Continuation chat chip created for session 2.
