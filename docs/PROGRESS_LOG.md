@@ -1,5 +1,10 @@
 # Bazingga Progress Log
 
+### 2026-07-04 (night) — ROOT-CAUSE fix: receiving + keyboard (OTA published)
+- Did: Found the real "not receiving" bug via 2-real-account browser testing — loadAll() silently returned 0 chats because it queried v3 columns (role, icon_emoji) that don not exist yet (schema v3 blocked by Supabase outage) -> Supabase errored the whole query -> no conversations loaded. Added graceful column fallback. Also: bootLive now waits for a valid session + sets realtime auth before subscribing; added a 3.5s polling reliability net so messages/moments/calls ALWAYS arrive even when realtime replication is degraded. VERIFIED bidirectional live delivery between Aisha QA and Omar QA in browser. Keyboard: whole-screen KeyboardAvoidingView + app.json softwareKeyboardLayoutMode=resize. Published OTA update group 11415f9d to preview branch (reaches APK #4 on relaunch).
+- Broke: Nothing (tsc clean). Native keyboard resize needs APK #5 (JS lift works OTA meanwhile). Push notifications still need APK #5.
+- Next: Nikhil confirms receiving on 2 phones (close+reopen app twice to pull OTA); APK #5 (push + native keyboard); schema v3 on Supabase recovery.
+
 ### 2026-07-04 (later) — APK #4: OTP length fix + OTA updates
 - Did: OTP screen adapts to code length (email 8 / SMS+demo 6 — root cause of "8-digit code, 6 boxes"); EAS Update (expo-updates) configured — JS fixes now ship over-the-air, no more reinstalls. APK #4: https://expo.dev/artifacts/eas/UbkKNgWsdQZwpfjXgsngMTsNC2hBWe-FlX-LH88Xf_I.apk
 - Broke: Nothing. Still pending: SCHEMA_V3 on Supabase recovery; set email OTP length to 6 in dashboard then; whitelist Neha's number in Twilio.
