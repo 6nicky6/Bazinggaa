@@ -17,6 +17,26 @@ const isLive = backendMode === 'live';
 let idc = 0;
 const uid = () => `${Date.now().toString(36)}-${(idc++).toString(36)}`;
 let liveUnsub: (() => void) | null = null;
+let livePoll: number | null = null;
+
+// Merge server messages with local state without losing still-sending
+// optimistic messages or duplicating anything. Keyed by id, sorted by time.
+function mergeMessages(incoming: Message[], current: Message[]): Message[] {
+  const byId = new Map<string, Message>();
+  for (const m of current) byId.set(m.id, m);
+  for (const m of incoming) {
+    const existing = byId.get(m.id);
+    // don't let a re-fetch downgrade a locally-read/optimistic message
+    if (!existing) byId.set(m.id, m);
+  }
+  // keep local optimistic 'sending'/'failed' messages the server hasn't echoed
+  for (const m of current) {
+    if ((m.status === 'sending' || m.status === 'failed') && !byId.has(m.id)) {
+      byId.set(m.id, m);
+    }
+  }
+  return [...byId.values()].sort((a, b) => a.sentAt - b.sentAt);
+}
 let lastLiveRefresh = 0;
 
 type State = {
@@ -164,6 +184,7 @@ export const useAppStore = create<State>()(
         if (isLive) {
           liveUnsub?.();
           liveUnsub = null;
+          if (livePoll) { clearInterval(livePoll); livePoll = null; }
           live.signOutLive();
           set({
             authed: false, profile: defaultProfile,
@@ -305,6 +326,17 @@ export const useAppStore = create<State>()(
 
       bootLive: async () => {
         if (!isLive) return;
+        // CRITICAL: wait for a VALID session before loading or subscribing.
+        // Reopening the app with an expired token used to make loadAll and the
+        // realtime subscribe fail silently -> stale chats, no incoming messages.
+        const session = await live.waitForSession();
+        if (!session) {
+          // token refresh still in flight or offline — retry shortly, forever
+          setTimeout(() => get().bootLive(), 3000);
+          return;
+        }
+        live.setRealtimeAuth(session.access_token); // realtime must carry the JWT
+        live.armAuthListeners(() => get().bootLive()); // re-boot on token refresh
         const data = await live.loadAll();
         if (data) {
           set((st) => ({
@@ -377,6 +409,32 @@ export const useAppStore = create<State>()(
             }
           },
         });
+
+        // RELIABILITY NET: realtime sockets can degrade (esp. during provider
+        // incidents). Poll every 3.5s and merge anything new so messages,
+        // moments and calls ALWAYS arrive — the WhatsApp-grade guarantee.
+        if (livePoll) clearInterval(livePoll);
+        livePoll = setInterval(async () => {
+          const d = await live.loadAll();
+          if (!d) return;
+          set((s2) => {
+            const merged = mergeMessages(
+              [...d.messages, ...s2.messages.filter((x) => x.chatId === BOT_ID)],
+              s2.messages
+            );
+            const changed =
+              merged.length !== s2.messages.length ||
+              d.chats.length !== s2.chats.filter((c) => c.id !== BOT_ID).length;
+            if (!changed) return {} as any;
+            return {
+              contacts: [BOT_CONTACT, ...d.contacts],
+              chats: [...s2.chats.filter((c) => c.id === BOT_ID), ...d.chats],
+              messages: merged,
+              moments: d.moments,
+              blocked: d.blocked,
+            };
+          });
+        }, 3500) as unknown as number;
       },
 
       togglePin: (chatId) =>

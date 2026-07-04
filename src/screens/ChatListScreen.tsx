@@ -38,7 +38,7 @@ export default function ChatListScreen({ navigation }: any) {
   const [search, setSearch] = useState('');
 
   const rows = useMemo(() => {
-    return chats
+    const out = chats
       .map((chat) => {
         let contact = contacts.find((c) => c.id === chat.contactId);
         if (chat.kind === 'group' || chat.kind === 'channel') {
@@ -68,6 +68,7 @@ export default function ChatListScreen({ navigation }: any) {
         if (!!a.chat.pinned !== !!b.chat.pinned) return a.chat.pinned ? -1 : 1;
         return (b.last?.sentAt ?? 0) - (a.last?.sentAt ?? 0);
       });
+    return out;
   }, [chats, contacts, messages, blocked, filter, search, lastReadAt]);
 
   const momentAuthors = useMemo(() => {

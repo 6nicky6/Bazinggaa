@@ -186,7 +186,11 @@ export default function ChatScreen({ navigation, route }: any) {
   if (!display) return null;
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={0}
+    >
       <GlowBackground />
 
       {/* Header */}
@@ -321,7 +325,7 @@ export default function ChatScreen({ navigation, route }: any) {
       )}
 
       {/* Input bar */}
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View>
         {readOnlyChannel ? (
           <View style={styles.blockedBar}>
             <Text style={styles.blockedText}>Only admins can post in this channel.</Text>
@@ -386,7 +390,7 @@ export default function ChatScreen({ navigation, route }: any) {
             )}
           </View>
         )}
-      </KeyboardAvoidingView>
+      </View>
 
       <AttachSheet
         visible={attachOpen}
@@ -435,7 +439,7 @@ export default function ChatScreen({ navigation, route }: any) {
           <Text style={styles.toastText}>{toast}</Text>
         </Animated.View>
       ) : null}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

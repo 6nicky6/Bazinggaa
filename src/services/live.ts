@@ -13,6 +13,42 @@ const gradIndex = (g: readonly [string, string]) => {
   return i >= 0 ? i : 1;
 };
 
+// Wait (briefly) for a valid session — getSession() transparently refreshes
+// an expired token using the stored refresh token.
+export async function waitForSession(): Promise<{ access_token: string } | null> {
+  if (!supabase) return null;
+  for (let i = 0; i < 5; i++) {
+    try {
+      const { data } = await supabase.auth.getSession();
+      if (data.session?.access_token) return data.session;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  return null;
+}
+
+export function setRealtimeAuth(token: string) {
+  try {
+    supabase?.realtime.setAuth(token);
+  } catch {}
+}
+
+// Keep realtime authorized across token refreshes; re-boot the store's live
+// pipeline whenever auth lands or rotates (fixes silent dead subscriptions).
+let authArmed = false;
+export function armAuthListeners(onAuthReady: () => void) {
+  if (!supabase || authArmed) return;
+  authArmed = true;
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session?.access_token) {
+      try {
+        supabase!.realtime.setAuth(session.access_token);
+      } catch {}
+      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') onAuthReady();
+    }
+  });
+}
+
 export async function myUserId(): Promise<string | null> {
   if (!supabase) return null;
   const { data } = await supabase.auth.getUser();
@@ -94,7 +130,12 @@ export async function loadAll(): Promise<LiveData | null> {
   try {
     const [profilesQ, membersQ, momentsQ, blocksQ] = await Promise.all([
       supabase.from('profiles').select('*').neq('id', uid),
-      supabase.from('chat_members').select('chat_id, user_id, role'),
+      // 'role' only exists after schema v3 — never let a missing column
+      // silently kill chat loading again (the great "not receiving" bug).
+      supabase.from('chat_members').select('chat_id, user_id, role')
+        .then((r) => r.error
+          ? supabase!.from('chat_members').select('chat_id, user_id')
+          : r),
       supabase.from('moments').select('*, moment_views(viewer_id)').gt('expires_at', new Date().toISOString()),
       supabase.from('blocks').select('blocked_id').eq('blocker_id', uid),
     ]);
@@ -115,13 +156,21 @@ export async function loadAll(): Promise<LiveData | null> {
     const myChats = [...new Set(
       members.filter((m: any) => m.user_id === uid).map((m: any) => m.chat_id as string)
     )];
+    if (membersQ.error) console.warn('[live] chat_members:', membersQ.error.message);
     let chats: Chat[] = [];
     if (myChats.length) {
-      const { data: chatRows } = await supabase
+      const q1 = await supabase
         .from('chats').select('id, type, name, icon_emoji').in('id', myChats);
+      let chatRows: any[] | null = q1.data;
+      if (q1.error) {
+        // pre-v3 schema: no icon_emoji column
+        const retry = await supabase.from('chats').select('id, type, name').in('id', myChats);
+        chatRows = retry.data;
+        if (retry.error) console.warn('[live] chats:', retry.error.message);
+      }
       chats = (chatRows ?? []).map((c: any) => {
-        const chatMembers = members.filter((m: any) => m.chat_id === c.id);
-        const mine = chatMembers.find((m: any) => m.user_id === uid);
+        const chatMembers: any[] = members.filter((m: any) => m.chat_id === c.id);
+        const mine: any = chatMembers.find((m: any) => m.user_id === uid);
         if (c.type === 'direct') {
           const other = chatMembers.find((m: any) => m.user_id !== uid);
           return { id: c.id, contactId: other?.user_id ?? '', kind: 'direct' as const };
