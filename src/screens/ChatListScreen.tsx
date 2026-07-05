@@ -59,11 +59,17 @@ export default function ChatListScreen({ navigation }: any) {
       })
       .filter((r): r is NonNullable<typeof r> => !!r)
       .filter((r) => (filter === 'All' ? true : r.contact.group === filter))
-      .filter((r) =>
-        search.trim()
-          ? r.contact.name.toLowerCase().includes(search.trim().toLowerCase())
-          : true
-      )
+      .filter((r) => {
+        if (!search.trim()) return true;
+        const q = search.trim().toLowerCase();
+        // search chat names AND message contents (WhatsApp-style global search)
+        return (
+          r.contact.name.toLowerCase().includes(q) ||
+          messages.some(
+            (m) => m.chatId === r.chat.id && !m.deleted && m.text.toLowerCase().includes(q)
+          )
+        );
+      })
       .sort((a, b) => {
         if (!!a.chat.pinned !== !!b.chat.pinned) return a.chat.pinned ? -1 : 1;
         return (b.last?.sentAt ?? 0) - (a.last?.sentAt ?? 0);
