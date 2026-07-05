@@ -11,6 +11,7 @@ import {
 import { backendMode } from '../services/supabase';
 import * as live from '../services/live';
 import { BOT_CONTACT, BOT_ID, botReply } from '../services/bot';
+import { OfficialChannel } from '../data/discover';
 import { notifyMessage } from '../services/notifications';
 import { AppState } from 'react-native';
 
@@ -94,6 +95,8 @@ type State = {
   markChatRead: (chatId: string) => void;
   ensureChat: (contactId: string) => Promise<string | null>;
   createGroup: (kind: 'group' | 'channel', name: string, icon: string, memberIds: string[]) => Promise<string | null>;
+  joinChannel: (ch: OfficialChannel) => string;
+  leaveChannel: (channelId: string) => void;
   bootLive: () => Promise<void>;
   togglePin: (chatId: string) => void;
   deleteChat: (chatId: string) => void;
@@ -351,6 +354,45 @@ export const useAppStore = create<State>()(
           ],
         }));
         return id;
+      },
+
+      joinChannel: (ch) => {
+        const id = `official-${ch.id}`;
+        if (get().chats.some((c) => c.id === id)) return id; // already joined
+        const now = Date.now();
+        const seeded: Message[] = ch.posts
+          .slice()
+          .reverse()
+          .map((p, i) => ({
+            id: `${id}-post-${i}`,
+            chatId: id,
+            senderId: id, // channel itself is the sender
+            text: p.text,
+            sentAt: now - p.agoMin * 60_000,
+            status: 'read' as const,
+          }));
+        set((st) => ({
+          contacts: [
+            {
+              id, name: ch.name, username: ch.handle, status: ch.description,
+              gradient: ch.gradient, initials: ch.emoji, group: 'Friends' as const, online: false,
+            },
+            ...st.contacts.filter((c) => c.id !== id),
+          ],
+          chats: [
+            { id, contactId: id, kind: 'channel' as const, name: ch.name, iconEmoji: ch.emoji, myRole: 'member' as const },
+            ...st.chats,
+          ],
+          messages: [...st.messages, ...seeded],
+        }));
+        return id;
+      },
+
+      leaveChannel: (channelId) => {
+        set((st) => ({
+          chats: st.chats.filter((c) => c.id !== channelId),
+          messages: st.messages.filter((m) => m.chatId !== channelId),
+        }));
       },
 
       bootLive: async () => {
