@@ -53,7 +53,7 @@ export type CallState = {
   contactId: string;
   video: boolean;
   direction: 'outgoing' | 'incoming';
-  status: 'ringing' | 'accepted' | 'declined' | 'ended' | 'missed';
+  status: 'ringing' | 'accepted' | 'declined' | 'ended' | 'missed' | 'unavailable';
   startedAt: number;
 };
 

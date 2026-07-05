@@ -215,18 +215,85 @@ export async function loadAll(): Promise<LiveData | null> {
   }
 }
 
+// ---------- inline media (pre-v3 fallback: no storage bucket yet) ----------
+// Voice/photos ride inside message content as base64 with a marker prefix:
+//   ⟦bza:<seconds>⟧<base64>   voice note (m4a)
+//   ⟦bzi⟧<base64>             photo (jpeg)
+// Once schema v3 + the media bucket land, uploads take over automatically.
+const AUDIO_MARK = '⟦bza:';
+const IMG_MARK = '⟦bzi⟧';
+const INLINE_LIMIT = 900_000; // base64 chars (~675KB binary) — keeps rows sane
+
+const B64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function toBase64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let out = '';
+  for (let i = 0; i < bytes.length; i += 3) {
+    const b1 = bytes[i], b2 = bytes[i + 1], b3 = bytes[i + 2];
+    out += B64_CHARS[b1 >> 2];
+    out += B64_CHARS[((b1 & 3) << 4) | (b2 === undefined ? 0 : b2 >> 4)];
+    out += b2 === undefined ? '=' : B64_CHARS[((b2 & 15) << 2) | (b3 === undefined ? 0 : b3 >> 6)];
+    out += b3 === undefined ? '=' : B64_CHARS[b3 & 63];
+  }
+  return out;
+}
+
+export async function inlineMediaContent(
+  localUri: string,
+  kind: 'image' | 'audio',
+  durationSec?: number
+): Promise<string | null> {
+  try {
+    const resp = await fetch(localUri);
+    const buf = await resp.arrayBuffer();
+    const b64 = toBase64(buf);
+    if (b64.length > INLINE_LIMIT) {
+      console.warn(`[live] inline ${kind} too large (${b64.length} chars) — skipped`);
+      return null;
+    }
+    return kind === 'audio' ? `${AUDIO_MARK}${durationSec ?? 0}⟧${b64}` : `${IMG_MARK}${b64}`;
+  } catch (e: any) {
+    console.warn('[live] inline media failed:', e?.message ?? e);
+    return null;
+  }
+}
+
+function parseInline(content: string): {
+  text: string; audioUrl?: string; audioDurationSec?: number; imageUrl?: string;
+} {
+  if (content?.startsWith(AUDIO_MARK)) {
+    const end = content.indexOf('⟧');
+    if (end > 0) {
+      const b64 = content.slice(end + 1);
+      const mime = b64.startsWith('UklG') ? 'audio/wav' : 'audio/mp4'; // sniff RIFF header
+      return {
+        text: '🎙️ Voice note',
+        audioUrl: `data:${mime};base64,${b64}`,
+        audioDurationSec: Number(content.slice(AUDIO_MARK.length, end)) || undefined,
+      };
+    }
+  }
+  if (content?.startsWith(IMG_MARK)) {
+    const b64 = content.slice(IMG_MARK.length);
+    const mime = b64.startsWith('iVBOR') ? 'image/png' : 'image/jpeg'; // sniff PNG header
+    return { text: '📷 Photo', imageUrl: `data:${mime};base64,${b64}` };
+  }
+  return { text: content };
+}
+
 function toMessage(m: any, uid: string): Message {
+  const inline = parseInline(m.content ?? '');
   return {
     id: m.id,
     chatId: m.chat_id,
     senderId: m.sender_id === uid ? 'me' : m.sender_id,
-    text: m.content,
+    text: inline.text,
     sentAt: new Date(m.sent_at).getTime(),
     status: m.read_at ? 'read' : m.delivered_at ? 'delivered' : 'sent',
     // parity columns (exist after schema v3; harmless before)
-    imageUrl: m.image_url ?? undefined,
-    audioUrl: m.audio_url ?? undefined,
-    audioDurationSec: m.audio_duration ?? undefined,
+    imageUrl: m.image_url ?? inline.imageUrl ?? undefined,
+    audioUrl: m.audio_url ?? inline.audioUrl ?? undefined,
+    audioDurationSec: m.audio_duration ?? inline.audioDurationSec ?? undefined,
     replyToId: m.reply_to ?? undefined,
     reactions: m.reactions && Object.keys(m.reactions).length ? remapReactions(m.reactions, uid) : undefined,
     deleted: m.deleted || undefined,

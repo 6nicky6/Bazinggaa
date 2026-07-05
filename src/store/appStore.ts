@@ -24,6 +24,7 @@ const isLocalChatId = (id: string) =>
   id === BOT_ID || id === SAVED_ID || id.startsWith('official-');
 import { OfficialChannel } from '../data/discover';
 import { notifyMessage } from '../services/notifications';
+import { playReceive, playSend, setSoundsEnabled } from '../services/sounds';
 import { AppState } from 'react-native';
 
 // app foreground/background tracking (native; web stays 'active')
@@ -41,10 +42,17 @@ function alertIncoming(
   contacts: Contact[],
   opts: { enabled: boolean; blocked: string[]; muted?: string[] }
 ) {
-  if (appActive || !opts.enabled) return;
-  for (const m of newMsgs.slice(-3)) {
-    if (m.senderId === 'me' || opts.blocked.includes(m.senderId)) continue;
-    if (opts.muted?.includes(m.chatId)) continue; // muted chats stay silent
+  if (!opts.enabled) return;
+  const audible = newMsgs.filter(
+    (m) => m.senderId !== 'me' && !opts.blocked.includes(m.senderId) && !opts.muted?.includes(m.chatId)
+  );
+  if (!audible.length) return;
+  if (appActive) {
+    // app in foreground: subtle in-app receive sound (WhatsApp-style)
+    playReceive();
+    return;
+  }
+  for (const m of audible.slice(-3)) {
     const from = contacts.find((c) => c.id === m.senderId);
     notifyMessage(from?.name ?? 'New message', m.text.slice(0, 120));
   }
@@ -276,6 +284,7 @@ export const useAppStore = create<State>()(
       sendMessage: (chatId, text, extras) => {
         const tempId = uid();
         const syncs = isLive && !isLocalChatId(chatId); // saved/channels stay on-device
+        if (get().settings.notifications) playSend();
         const msg: Message = {
           id: tempId, chatId, senderId: 'me', text,
           sentAt: Date.now(), status: syncs ? 'sending' : 'sent',
@@ -346,10 +355,17 @@ export const useAppStore = create<State>()(
           // arrives on the other person's phone
           live.uploadImage(chatId, imageUri).then(async (url) => {
             if (!url) {
-              // storage not ready (pre-v3) or offline — keep local, mark failed
+              // storage bucket not live yet (pre-v3) — send the photo inline
+              // inside the message row so it still reaches the other phone
+              const inline = await live.inlineMediaContent(imageUri, 'image');
+              const inlineMsg = inline ? await live.sendMessageLive(chatId, inline) : null;
               set((st) => ({
                 messages: st.messages.map((m) =>
-                  m.id === tempId ? { ...m, status: 'failed' as const } : m
+                  m.id === tempId
+                    ? inlineMsg
+                      ? { ...inlineMsg, imageUri, text: '' }
+                      : { ...m, status: 'failed' as const }
+                    : m
                 ),
               }));
               return;
@@ -390,15 +406,17 @@ export const useAppStore = create<State>()(
           scheduleAutoReply(chatId, 'sent you a voice note 🎙️');
         } else if (isRealChat) {
           live.uploadMedia(chatId, audioUri, 'audio').then(async (url) => {
-            if (!url) {
-              set((st) => ({
-                messages: st.messages.map((m) => (m.id === tempId ? { ...m, status: 'failed' as const } : m)),
-              }));
-              return;
+            let serverMsg: Message | null = null;
+            if (url) {
+              serverMsg = await live.sendMessageLive(chatId, '🎙️ Voice message', {
+                audioUrl: url, audioDurationSec: durationSec,
+              });
+            } else {
+              // storage bucket not live yet (pre-v3) — send the audio inline
+              // inside the message row so it still reaches the other phone
+              const inline = await live.inlineMediaContent(audioUri, 'audio', durationSec);
+              if (inline) serverMsg = await live.sendMessageLive(chatId, inline);
             }
-            const serverMsg = await live.sendMessageLive(chatId, '🎙️ Voice message', {
-              audioUrl: url, audioDurationSec: durationSec,
-            });
             set((st) => ({
               messages: st.messages.map((m) =>
                 m.id === tempId
@@ -832,6 +850,15 @@ export const useAppStore = create<State>()(
               set((st) => st.activeCall?.id === callId
                 ? { activeCall: { ...st.activeCall, id: serverId } }
                 : {});
+            } else {
+              // calls table not live yet (pre-v3) — be honest instead of
+              // ringing into the void forever
+              set((st) => st.activeCall?.id === callId
+                ? { activeCall: { ...st.activeCall, status: 'unavailable' as const } }
+                : {});
+              setTimeout(() => {
+                set((st) => (st.activeCall?.status === 'unavailable' ? { activeCall: null } : {}));
+              }, 3200);
             }
           });
         } else {
@@ -883,8 +910,10 @@ export const useAppStore = create<State>()(
         }));
       },
 
-      setSetting: (k, v) =>
-        set((st) => ({ settings: { ...st.settings, [k]: v } })),
+      setSetting: (k, v) => {
+        if (k === 'notifications') setSoundsEnabled(v);
+        set((st) => ({ settings: { ...st.settings, [k]: v } }));
+      },
       updateProfile: (p) =>
         set((st) => ({ profile: { ...st.profile, ...p } })),
     }),

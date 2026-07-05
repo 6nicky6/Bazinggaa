@@ -22,7 +22,9 @@ class GeminiProvider implements SmartReplyProvider {
     lastCall = Date.now();
     try {
       const res = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
+        // flash-lite: smart replies fire on every incoming message and must
+        // not eat the flash quota BazinggaBot depends on
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent',
         {
           method: 'POST',
           headers: {
@@ -82,32 +84,35 @@ export const aiProviderName = GEMINI_KEY ? 'Gemini Flash (live)' : 'Demo mode (a
 // ---------- AI trio: summarize, translate, mood (silent-fail like everything) ----------
 async function gemini(prompt: string, maxTokens = 400): Promise<string | null> {
   if (!GEMINI_KEY) return null;
-  try {
-    const res = await fetch(
-      'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_KEY as string },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            maxOutputTokens: maxTokens,
-            temperature: 0.4,
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-      }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const text = (data?.candidates?.[0]?.content?.parts ?? [])
-      .map((p: any) => p.text ?? '')
-      .join('')
-      .trim();
-    return text || null;
-  } catch {
-    return null;
+  // flash-lite FIRST: these helper features fire constantly and would starve
+  // the shared free-tier quota that BazinggaBot needs; each model has its own
+  for (const model of ['gemini-flash-lite-latest', 'gemini-flash-latest']) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_KEY as string },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              maxOutputTokens: maxTokens,
+              temperature: 0.4,
+              thinkingConfig: { thinkingBudget: 0 },
+            },
+          }),
+        }
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      const text = (data?.candidates?.[0]?.content?.parts ?? [])
+        .map((p: any) => p.text ?? '')
+        .join('')
+        .trim();
+      if (text) return text;
+    } catch {}
   }
+  return null;
 }
 
 export async function summarizeChat(

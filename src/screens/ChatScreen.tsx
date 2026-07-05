@@ -19,6 +19,7 @@ import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
 import { ChatMood, detectMood, smartReplies, summarizeChat, translateText } from '../services/ai';
 import { reportLive } from '../services/live';
+import { playRecord } from '../services/sounds';
 import { backendMode } from '../services/supabase';
 import { Message } from '../types';
 
@@ -158,33 +159,43 @@ export default function ChatScreen({ navigation, route }: any) {
     }
   };
 
-  // WhatsApp-style mic: hold = record, slide up = lock (keep recording hands-free)
+  // WhatsApp-style mic: hold = record, slide up = lock (hands-free),
+  // slide left = cancel, release = send
+  const recCancelledRef = React.useRef(false);
   const micPan = React.useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => !draft.trim(),
         onPanResponderGrant: () => {
           recLockedRef.current = false;
+          recCancelledRef.current = false;
           setRecLocked(false);
           setRecSecs(0);
           setRecording(true);
+          playRecord();
           beginRecording();
         },
         onPanResponderMove: (_e, g) => {
-          if (g.dy < -45 && !recLockedRef.current) {
+          if (recCancelledRef.current || recLockedRef.current) return;
+          if (g.dy < -45) {
             recLockedRef.current = true;
             setRecLocked(true);
+          } else if (g.dx < -70) {
+            recCancelledRef.current = true;
+            setRecording(false);
+            finishRecording(false);
+            showToast('Recording cancelled');
           }
         },
         onPanResponderRelease: () => {
-          if (!recLockedRef.current) {
+          if (!recLockedRef.current && !recCancelledRef.current) {
             setRecording(false);
             finishRecording(true); // release = send (WhatsApp behavior)
           }
-          // locked: keep recording until Cancel/Send tapped
+          // locked: keep recording until trash / send tapped
         },
         onPanResponderTerminate: () => {
-          if (!recLockedRef.current) {
+          if (!recLockedRef.current && !recCancelledRef.current) {
             setRecording(false);
             finishRecording(false);
           }
@@ -426,13 +437,16 @@ export default function ChatScreen({ navigation, route }: any) {
                     <Text style={styles.imageNote}>Not synced · tap to retry</Text>
                   )}
                 </>
-              ) : (
+              ) : m.text ? (
                 <>
                   <Text style={styles.msgText}>{m.text}</Text>
                   {translations[m.id] && (
                     <Text style={styles.translatedText}>🌐 {translations[m.id]}</Text>
                   )}
                 </>
+              ) : (
+                // media that never made it to this device (old pre-fix sends)
+                <Text style={styles.deletedText}>📎 Media unavailable</Text>
               )}
               <View style={styles.metaRow}>
                 {m.starred && <Ionicons name="star" size={11} color={colors.yellow} />}
@@ -481,7 +495,7 @@ export default function ChatScreen({ navigation, route }: any) {
                       {inner}
                     </LinearGradient>
                   ) : (
-                    <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs, m.deleted && styles.bubbleDeleted]}>
+                    <View style={[styles.bubble, { maxWidth: '100%' }, mine ? styles.bubbleMine : styles.bubbleTheirs, m.deleted && styles.bubbleDeleted]}>
                       {inner}
                     </View>
                   )}
@@ -551,15 +565,14 @@ export default function ChatScreen({ navigation, route }: any) {
               <View style={[styles.input, styles.recordingBar]}>
                 <View style={styles.recDot} />
                 <Text style={styles.recText}>
-                  {recLocked ? '🔒 ' : ''}Recording… 0:{String(recSecs).padStart(2, '0')}
+                  {recLocked ? '🔒 ' : ''}{Math.floor(recSecs / 60)}:{String(recSecs % 60).padStart(2, '0')}
                 </Text>
                 {recLocked ? (
-                  <View style={{ flexDirection: 'row', gap: 14, marginLeft: 'auto' }}>
-                    <Text style={styles.recCancel} onPress={() => stopRecording(false)}>Cancel</Text>
-                    <Text style={styles.recSend} onPress={() => stopRecording(true)}>Send</Text>
-                  </View>
+                  <Pressable onPress={() => stopRecording(false)} style={styles.recTrash} hitSlop={10}>
+                    <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+                  </Pressable>
                 ) : (
-                  <Text style={styles.recHint}>⬆ slide up to lock</Text>
+                  <Text style={styles.recHint} numberOfLines={1}>◀ cancel · ⬆ lock</Text>
                 )}
               </View>
             ) : (
@@ -576,8 +589,13 @@ export default function ChatScreen({ navigation, route }: any) {
                 onSubmitEditing={() => send()}
               />
             )}
-            {draft.trim() ? (
-              <PressableScale onPress={() => send()} scaleTo={0.85} style={styles.sendWrap}>
+            {draft.trim() || (recording && recLocked) ? (
+              // locked recording: the mic morphs into the send button (always visible)
+              <PressableScale
+                onPress={() => (recording ? stopRecording(true) : send())}
+                scaleTo={0.85}
+                style={styles.sendWrap}
+              >
                 <LinearGradient
                   colors={gradients.primary}
                   start={{ x: 0, y: 0 }}
@@ -589,6 +607,12 @@ export default function ChatScreen({ navigation, route }: any) {
               </PressableScale>
             ) : (
               <View style={styles.sendWrap} {...micPan.panHandlers}>
+                {recording && !recLocked && (
+                  <View style={styles.lockHint} pointerEvents="none">
+                    <Ionicons name="chevron-up" size={14} color={colors.yellow} />
+                    <Ionicons name="lock-open-outline" size={16} color={colors.yellow} />
+                  </View>
+                )}
                 <LinearGradient
                   colors={recording ? ([colors.red, colors.redHot] as const) : gradients.primary}
                   start={{ x: 0, y: 0 }}
@@ -939,7 +963,13 @@ const styles = StyleSheet.create({
   },
   recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red },
   recText: { color: colors.white, fontSize: 14.5, fontFamily: fonts.semiBold },
-  recHint: { color: colors.textTertiary, fontSize: 12, fontFamily: fonts.regular, marginLeft: 'auto' },
+  recHint: { color: colors.textTertiary, fontSize: 12, fontFamily: fonts.regular, marginLeft: 'auto', flexShrink: 1 },
+  recTrash: { marginLeft: 'auto', padding: 4 },
+  lockHint: {
+    position: 'absolute', bottom: 54, alignSelf: 'center', alignItems: 'center',
+    backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.glassBorder,
+    borderRadius: 18, paddingHorizontal: 8, paddingVertical: 8, gap: 2, zIndex: 5,
+  },
   recCancel: { color: colors.textSecondary, fontSize: 13.5, fontFamily: fonts.semiBold },
   recSend: { color: colors.yellow, fontSize: 13.5, fontFamily: fonts.semiBold },
   // parity wave 1

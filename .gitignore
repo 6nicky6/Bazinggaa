@@ -45,3 +45,5 @@ yarn-error.*
 
 # persistent QA test accounts (sessions + inbox creds)
 .test-accounts.json
+
+.qa-session-*.json

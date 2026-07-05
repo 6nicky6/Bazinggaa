@@ -104,6 +104,10 @@ export default function RootNavigator() {
   React.useEffect(() => {
     if (authed && hasProfile) {
       bootLive();
+      // interaction sounds follow the saved notifications toggle
+      import('../services/sounds').then((s) =>
+        s.setSoundsEnabled(useAppStore.getState().settings.notifications)
+      );
       // notifications: ask permission + register this device for push
       import('../services/notifications').then(async (n) => {
         await n.initNotifications();

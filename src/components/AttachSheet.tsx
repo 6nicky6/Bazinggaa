@@ -2,7 +2,7 @@ import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInDown, SlideInDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn, SlideInDown } from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
 import PressableScale from './PressableScale';
 import { colors } from '../theme/colors';
@@ -35,7 +35,9 @@ export default function AttachSheet({ visible, onClose, onImage, onComingSoon }:
           const perm = await ImagePicker.requestCameraPermissionsAsync();
           if (!perm.granted) { onClose(); return; }
         }
-        const res = await fn({ mediaTypes: ['images'], quality: 0.8, allowsEditing: false });
+        // quality 0.4 keeps photos small enough to travel inline until the
+        // storage bucket goes live (then we can raise it again)
+        const res = await fn({ mediaTypes: ['images'], quality: 0.4, allowsEditing: false, exif: false });
         onClose();
         if (!res.canceled && res.assets?.[0]?.uri) onImage(res.assets[0].uri);
       } catch {
@@ -53,11 +55,14 @@ export default function AttachSheet({ visible, onClose, onImage, onComingSoon }:
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
-        <Animated.View entering={SlideInDown.springify().damping(18)} style={styles.sheet}>
+        <Animated.View
+          entering={SlideInDown.duration(240).easing(Easing.out(Easing.cubic))}
+          style={styles.sheet}
+        >
           <View style={styles.handle} />
           <View style={styles.grid}>
             {OPTIONS.map((o, i) => (
-              <Animated.View key={o.key} entering={FadeInDown.delay(60 + i * 40).springify()}>
+              <Animated.View key={o.key} entering={FadeIn.delay(40 + i * 25).duration(160)}>
                 <PressableScale style={styles.cell} scaleTo={0.88} onPress={() => pick(o.key)}>
                   <LinearGradient colors={o.colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.iconCircle}>
                     <Ionicons name={o.icon} size={24} color={colors.white} />

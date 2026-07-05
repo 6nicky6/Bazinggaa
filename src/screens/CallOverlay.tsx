@@ -58,8 +58,18 @@ export default function CallOverlay() {
             ? call.direction === 'incoming'
               ? `Incoming ${call.video ? 'video' : 'voice'} call…`
               : 'Ringing…'
-            : `Connected · ${mins}`}
+            : call.status === 'unavailable'
+              ? 'Calls unlock with our next server upgrade ⏳'
+              : `Connected · ${mins}`}
         </Text>
+        {call.status === 'unavailable' && (
+          <View style={styles.banner}>
+            <Ionicons name="construct-outline" size={14} color={colors.yellow} />
+            <Text style={styles.bannerText}>
+              Almost there — calling goes live for everyone very soon. Send a voice note meanwhile 🎙️
+            </Text>
+          </View>
+        )}
         {call.status === 'accepted' && (
           <View style={styles.banner}>
             <Ionicons name="construct-outline" size={14} color={colors.yellow} />
