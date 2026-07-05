@@ -147,6 +147,8 @@ export default function ProfileScreen({ navigation }: any) {
               </Row>
             </PressableScale>
             <View style={styles.divider} />
+            <Row icon="moon" label="Theme" sub="Premium Dark (light mode coming with Bazingga+)" />
+            <View style={styles.divider} />
             <Row icon="information-circle" label="About" sub="Bazingga v0.1.0 · Fast. Private. Expressive." />
           </View>
         </Animated.View>

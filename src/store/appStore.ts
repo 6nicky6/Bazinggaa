@@ -11,6 +11,17 @@ import {
 import { backendMode } from '../services/supabase';
 import * as live from '../services/live';
 import { BOT_CONTACT, BOT_ID, botReply } from '../services/bot';
+
+// Saved Messages: your personal cloud-style notes chat (local, private)
+export const SAVED_ID = 'saved-messages';
+const SAVED_CONTACT: Contact = {
+  id: SAVED_ID, name: 'Saved Messages', username: 'you',
+  status: 'Notes to self — only you can see this',
+  gradient: gradients.bolt, initials: '🔖', group: 'Friends', online: false,
+};
+// chats that live entirely on-device (never synced, never wiped by reloads)
+const isLocalChatId = (id: string) =>
+  id === BOT_ID || id === SAVED_ID || id.startsWith('official-');
 import { OfficialChannel } from '../data/discover';
 import { notifyMessage } from '../services/notifications';
 import { AppState } from 'react-native';
@@ -213,11 +224,12 @@ export const useAppStore = create<State>()(
       profile: defaultProfile,
       // live mode starts near-empty and fills from Supabase in bootLive();
       // BazinggaBot lives locally in BOTH modes (client-side AI contact)
-      contacts: isLive ? [BOT_CONTACT] : [...CONTACTS, BOT_CONTACT],
+      contacts: isLive ? [BOT_CONTACT, SAVED_CONTACT] : [...CONTACTS, BOT_CONTACT, SAVED_CONTACT],
       chats: isLive
-        ? [{ id: BOT_ID, contactId: BOT_ID }]
+        ? [{ id: BOT_ID, contactId: BOT_ID }, { id: SAVED_ID, contactId: SAVED_ID }]
         : [
             { id: BOT_ID, contactId: BOT_ID },
+            { id: SAVED_ID, contactId: SAVED_ID },
             { id: 'aisha', contactId: 'aisha' },
             { id: 'mom', contactId: 'mom' },
             { id: 'rahul', contactId: 'rahul' },
@@ -263,9 +275,10 @@ export const useAppStore = create<State>()(
 
       sendMessage: (chatId, text, extras) => {
         const tempId = uid();
+        const syncs = isLive && !isLocalChatId(chatId); // saved/channels stay on-device
         const msg: Message = {
           id: tempId, chatId, senderId: 'me', text,
-          sentAt: Date.now(), status: isLive ? 'sending' : 'sent',
+          sentAt: Date.now(), status: syncs ? 'sending' : 'sent',
           replyToId: extras?.replyToId,
           forwarded: extras?.forwarded,
         };
@@ -291,7 +304,7 @@ export const useAppStore = create<State>()(
           });
           return;
         }
-        if (isLive) {
+        if (syncs) {
           live.sendMessageLive(chatId, text, extras).then((serverMsg) => {
             set((st) => ({
               messages: st.messages.map((m) =>
@@ -305,14 +318,14 @@ export const useAppStore = create<State>()(
             // risk, caught in security review). Ships as a Supabase Edge
             // Function triggered by message inserts once the dashboard is back.
           });
-        } else {
+        } else if (!isLive && chatId !== SAVED_ID) {
           scheduleAutoReply(chatId, text);
         }
       },
 
       sendImage: (chatId, imageUri) => {
         const tempId = uid();
-        const isRealChat = isLive && chatId !== BOT_ID && !chatId.startsWith('official-');
+        const isRealChat = isLive && !isLocalChatId(chatId);
         const msg: Message = {
           id: tempId, chatId, senderId: 'me', text: '', imageUri,
           sentAt: Date.now(), status: isRealChat ? 'sending' : 'sent',
@@ -357,7 +370,7 @@ export const useAppStore = create<State>()(
 
       sendVoice: (chatId, audioUri, durationSec) => {
         const tempId = uid();
-        const isRealChat = isLive && chatId !== BOT_ID && !chatId.startsWith('official-');
+        const isRealChat = isLive && !isLocalChatId(chatId);
         set((st) => ({
           messages: [...st.messages, {
             id: tempId, chatId, senderId: 'me', text: '', audioUri,
@@ -437,7 +450,7 @@ export const useAppStore = create<State>()(
             m.id === messageId ? { ...m, reactions: Object.keys(r).length ? r : undefined } : m
           ),
         }));
-        if (isLive && msg.chatId !== BOT_ID && !msg.chatId.startsWith('official-')) {
+        if (isLive && !isLocalChatId(msg.chatId)) {
           live.reactLive(messageId, emoji, adding);
         }
       },
@@ -453,7 +466,7 @@ export const useAppStore = create<State>()(
                 : m
             ),
           }));
-          if (isLive && msg.chatId !== BOT_ID && !msg.chatId.startsWith('official-')) {
+          if (isLive && !isLocalChatId(msg.chatId)) {
             live.deleteMessageLive(messageId);
           }
         } else {
@@ -488,7 +501,7 @@ export const useAppStore = create<State>()(
       markChatRead: (chatId) => {
         set((st) => ({ lastReadAt: { ...st.lastReadAt, [chatId]: Date.now() } }));
         // read receipts: tell the sender their message was seen (throttled)
-        if (isLive && chatId !== BOT_ID && !chatId.startsWith('official-')) {
+        if (isLive && !isLocalChatId(chatId)) {
           const now = Date.now();
           if (now - (lastReadSync[chatId] ?? 0) > 2500) {
             lastReadSync[chatId] = now;
@@ -498,7 +511,7 @@ export const useAppStore = create<State>()(
       },
 
       notifyTyping: (chatId) => {
-        if (!isLive || chatId === BOT_ID || chatId.startsWith('official-')) return;
+        if (!isLive || isLocalChatId(chatId)) return;
         const now = Date.now();
         if (now - (lastTypingSent[chatId] ?? 0) > 2500) {
           lastTypingSent[chatId] = now;
@@ -605,15 +618,15 @@ export const useAppStore = create<State>()(
         const data = await live.loadAll();
         if (data) {
           set((st) => ({
-            contacts: [BOT_CONTACT, ...data.contacts],
+            contacts: [BOT_CONTACT, SAVED_CONTACT, ...data.contacts],
             chats: [
-              ...st.chats.filter((c) => c.id === BOT_ID),
+              ...st.chats.filter((c) => isLocalChatId(c.id)),
               ...data.chats,
             ],
             // server messages + local bot history (bot is client-side)
             messages: [
               ...data.messages,
-              ...st.messages.filter((m) => m.chatId === BOT_ID),
+              ...st.messages.filter((m) => isLocalChatId(m.chatId)),
             ],
             moments: data.moments,
             blocked: data.blocked,
@@ -646,14 +659,14 @@ export const useAppStore = create<State>()(
                 live.loadAll().then((d) => {
                   if (!d) return;
                   set((s2) => ({
-                    contacts: [BOT_CONTACT, ...d.contacts],
+                    contacts: [BOT_CONTACT, SAVED_CONTACT, ...d.contacts],
                     chats: [
-                      ...s2.chats.filter((c) => c.id === BOT_ID),
+                      ...s2.chats.filter((c) => isLocalChatId(c.id)),
                       ...d.chats,
                     ],
                     messages: [
                       ...d.messages,
-                      ...s2.messages.filter((x) => x.chatId === BOT_ID),
+                      ...s2.messages.filter((x) => isLocalChatId(x.chatId)),
                     ],
                   }));
                 });
@@ -715,7 +728,7 @@ export const useAppStore = create<State>()(
           if (!d) return;
           set((s2) => {
             const merged = mergeMessages(
-              [...d.messages, ...s2.messages.filter((x) => x.chatId === BOT_ID)],
+              [...d.messages, ...s2.messages.filter((x) => isLocalChatId(x.chatId))],
               s2.messages
             );
             const changed =
@@ -729,8 +742,8 @@ export const useAppStore = create<State>()(
               muted: s2.chats.filter((c) => c.muted).map((c) => c.id),
             });
             return {
-              contacts: [BOT_CONTACT, ...d.contacts],
-              chats: [...s2.chats.filter((c) => c.id === BOT_ID), ...d.chats],
+              contacts: [BOT_CONTACT, SAVED_CONTACT, ...d.contacts],
+              chats: [...s2.chats.filter((c) => isLocalChatId(c.id)), ...d.chats],
               messages: merged,
               moments: d.moments,
               blocked: d.blocked,

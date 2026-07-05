@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  FlatList, ScrollView, StyleSheet, Text, TextInput, View,
+  FlatList, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -36,6 +36,11 @@ export default function ChatListScreen({ navigation }: any) {
 
   const [filter, setFilter] = useState<ChatFilter>('All');
   const [search, setSearch] = useState('');
+  const [rowMenu, setRowMenu] = useState<string | null>(null);
+  const togglePin = useAppStore((s) => s.togglePin);
+  const toggleMute = useAppStore((s) => s.toggleMute);
+  const deleteChat = useAppStore((s) => s.deleteChat);
+  const menuChat = chats.find((c) => c.id === rowMenu);
 
   const rows = useMemo(() => {
     const out = chats
@@ -212,6 +217,8 @@ export default function ChatListScreen({ navigation }: any) {
               scaleTo={0.98}
               haptic={false}
               onPress={() => navigation.navigate('Chat', { chatId: item.chat.id })}
+              onLongPress={() => setRowMenu(item.chat.id)}
+              delayLongPress={320}
             >
               <Avatar
                 gradient={item.contact.gradient}
@@ -255,6 +262,26 @@ export default function ChatListScreen({ navigation }: any) {
         )}
       />
 
+      {/* chat row long-press menu: pin / mute / delete */}
+      <Modal visible={!!rowMenu} transparent animationType="fade" onRequestClose={() => setRowMenu(null)}>
+        <Pressable style={styles.rowMenuBackdrop} onPress={() => setRowMenu(null)}>
+          <Animated.View entering={FadeInDown.duration(180)} style={styles.rowMenu}>
+            <PressableScale haptic={false} style={styles.rowMenuItem} onPress={() => { if (rowMenu) togglePin(rowMenu); setRowMenu(null); }}>
+              <Ionicons name={menuChat?.pinned ? 'pin' : 'pin-outline'} size={18} color={colors.yellow} />
+              <Text style={styles.rowMenuText}>{menuChat?.pinned ? 'Unpin' : 'Pin to top'}</Text>
+            </PressableScale>
+            <PressableScale haptic={false} style={styles.rowMenuItem} onPress={() => { if (rowMenu) toggleMute(rowMenu); setRowMenu(null); }}>
+              <Ionicons name={menuChat?.muted ? 'notifications-outline' : 'notifications-off-outline'} size={18} color={colors.textSecondary} />
+              <Text style={styles.rowMenuText}>{menuChat?.muted ? 'Unmute' : 'Mute'}</Text>
+            </PressableScale>
+            <PressableScale haptic={false} style={styles.rowMenuItem} onPress={() => { if (rowMenu) deleteChat(rowMenu); setRowMenu(null); }}>
+              <Ionicons name="trash-outline" size={18} color={colors.red} />
+              <Text style={[styles.rowMenuText, { color: colors.red }]}>Delete chat</Text>
+            </PressableScale>
+          </Animated.View>
+        </Pressable>
+      </Modal>
+
       {/* FAB → new chat */}
       <Animated.View entering={FadeInDown.delay(450).springify()} style={styles.fabWrap}>
         <PressableScale scaleTo={0.9} onPress={() => navigation.navigate('Contacts')}>
@@ -273,6 +300,10 @@ export default function ChatListScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
+  rowMenuBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 50 },
+  rowMenu: { backgroundColor: '#1F1F1F', borderRadius: 18, padding: 6, borderWidth: 1, borderColor: 'rgba(255,255,255,0.10)' },
+  rowMenuItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 14 },
+  rowMenuText: { color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_500Medium' },
   container: { flex: 1, backgroundColor: colors.black, paddingTop: 58 },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
