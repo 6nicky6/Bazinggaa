@@ -61,11 +61,17 @@ def mailtm_token(email, pw):
     _, t = req(f"{MT}/token", "POST", {"address": email, "password": pw})
     return t.get("token")
 
-def wait_code(mt_tok, tries=30):
-    seen_at = time.time()
+def inbox_ids(mt_tok):
+    _, msgs = req(f"{MT}/messages", headers={"Authorization": f"Bearer {mt_tok}"})
+    return {m["id"] for m in msgs.get("hydra:member", [])}
+
+def wait_code(mt_tok, skip_ids=None, tries=30):
+    # only read messages that arrived AFTER the OTP request — old codes are expired
+    skip_ids = skip_ids or set()
     for _ in range(tries):
         _, msgs = req(f"{MT}/messages", headers={"Authorization": f"Bearer {mt_tok}"})
         for m in msgs.get("hydra:member", []):
+            if m["id"] in skip_ids: continue
             _, full = req(f"{MT}/messages/{m['id']}", headers={"Authorization": f"Bearer {mt_tok}"})
             text = (full.get("text") or "") + " ".join(full.get("html") or [])
             codes = re.findall(r"\b(\d{6,10})\b", text)
@@ -98,11 +104,17 @@ def ensure_account(store, tag, uname, name, emoji_grad):
         email, mtpw = mailtm_new()
         log(f"[{tag}] new inbox {email}")
     mt = mailtm_token(email, mtpw)
-    if not send_otp_patient(email): sys.exit(f"[{tag}] could not send OTP within window")
-    code = wait_code(mt)
-    log(f"[{tag}] code received ({len(code) if code else 0} digits)")
-    s, r = req(f"{SB}/auth/v1/verify", "POST", {"type": "email", "email": email, "token": code}, {"apikey": ANON})
-    if s != 200: sys.exit(f"[{tag}] verify failed {s}: {r}")
+    s, r = 0, {}
+    for attempt in range(3):
+        old_ids = inbox_ids(mt)
+        if not send_otp_patient(email): sys.exit(f"[{tag}] could not send OTP within window")
+        code = wait_code(mt, skip_ids=old_ids)
+        log(f"[{tag}] code received ({len(code) if code else 0} digits)")
+        s, r = req(f"{SB}/auth/v1/verify", "POST", {"type": "email", "email": email, "token": code}, {"apikey": ANON})
+        if s == 200: break
+        log(f"[{tag}] verify attempt {attempt+1} failed {s}: {r} — retrying with fresh code")
+        time.sleep(65)  # respect Supabase OTP resend rate limit
+    if s != 200: sys.exit(f"[{tag}] verify failed after retries {s}: {r}")
     acct = {"email": email, "mt_password": mtpw, "jwt": r["access_token"],
             "refresh_token": r["refresh_token"], "uid": r["user"]["id"]}
     store[key] = acct; save_store(store)
