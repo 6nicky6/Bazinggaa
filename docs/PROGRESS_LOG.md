@@ -1,5 +1,10 @@
 # Bazingga Progress Log
 
+### 2026-07-05 (evening) — APK #6: the real-life test build
+- Did: APK #6 built with ALL marathon features baked in natively (build 4e627de1): https://expo.dev/artifacts/eas/jNLqAR5l2-Ah3O0CmGszghdsoNoMVdKq3j5dZ5_s47Q.apk — this is the 2-user real-life test build. Includes deduped permissions, keyboard resize, mic permission, expo-audio/clipboard/image-picker native modules matching the OTA JS.
+- Broke: Nothing. E2E regression mid-run (tester B waiting out Supabase email rate limit). Firebase push still needs Nikhil's click after test confirmation.
+- Next: Nikhil installs APK #6 on 2 phones → real-life test; E2E results; Supabase recovery batch on outage clear.
+
 ### 2026-07-05 (marathon) — Phase 2 feature-complete → OTA published + Play Store pack
 - Did: THE ENTIRE FEATURE BOARD in one marathon — parity wave 1 (reply/quote, 6-emoji reactions, delete-for-everyone, forward), photo transfer (Supabase Storage), real presence/typing/last-seen/read-receipts, real voice notes (hold-record/slide-lock/playback), parity wave 2 (star, mute, global message search, wallpapers, profile photos), Moments social loop (react + reply→DM), Close Friends & Family Circles + audience picker, Saved Messages, chat-row pin/mute/delete menu, AI trio (Summarize ✨ / inline Translate 🌐 / Mood Engine tint), Bazingga+ subscription screen (design-complete, payments at launch). ALL schema-tolerant pre-v3, all tsc-clean, committed per feature. OTA update group 466aa072 published to preview (APK #5 phones get everything on relaunch). Play Store pack written: docs/store/PLAY_STORE_LISTING.md + privacy-policy.html. E2E suite hardened (stale-OTP fix) + full regression running.
 - Broke: Nothing known. Supabase dashboard outage STILL blocks SCHEMA_V3.sql (watcher re-armed); email OTP 8→6 + OtpScreen change queued behind recovery.
