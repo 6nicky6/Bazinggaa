@@ -1,6 +1,7 @@
 # Bazingga — Vision vs. Reality (Feature Gap Report)
 
 > Generated 5 Jul 2026 by auditing the actual code in `src/` against the original ChatGPT planning vision.
+> Coverage note: one document extractor crashed during the automated run; that file ("Bazinggaa - ChatGPT Conv i saved.docx") was subsequently read in full manually and reconciled — its content overlapped the other two docs except Unified Inbox, added below. All 3 source documents are now fully covered.
 > Plain-English status for every feature the vision ever mentioned.
 
 **How to read the statuses:**
@@ -75,6 +76,7 @@
 | Close Friends & Family Circles | ❌ MISSING | No circles concept anywhere — everything posts to all contacts |
 | Status updates with mood | 🟡 PARTIAL | Editable status text exists on the profile; no mood attached to it |
 | AI Avatar chats / voice rooms / shared AI playlists | ❌ MISSING | Idea-stage brainstorms; nothing built |
+| Unified Inbox (merge WhatsApp/Telegram/SMS/Instagram DMs into one AI feed) | ❌ MISSING | Idea-stage from the original brainstorm. Honest note: WhatsApp/Instagram forbid third-party clients (ToS + technical blocks), so full unification isn't legally buildable; an SMS-inbox integration on Android is the only realistic slice |
 
 ## 6. Calls
 
