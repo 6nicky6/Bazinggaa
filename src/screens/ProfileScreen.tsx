@@ -25,6 +25,9 @@ export default function ProfileScreen({ navigation }: any) {
 
   const [editOpen, setEditOpen] = useState(false);
   const [blockedOpen, setBlockedOpen] = useState(false);
+  const [starredOpen, setStarredOpen] = useState(false);
+  const messages = useAppStore((s) => s.messages);
+  const starredMsgs = messages.filter((m) => m.starred && !m.deleted);
   const [name, setName] = useState(profile.name);
   const [statusText, setStatusText] = useState(profile.statusText);
 
@@ -64,6 +67,18 @@ export default function ProfileScreen({ navigation }: any) {
                 thumbColor={colors.white}
               />
             </Row>
+          </View>
+        </Animated.View>
+
+        {/* starred messages */}
+        <Animated.View entering={FadeInDown.delay(130).duration(450)}>
+          <Text style={styles.section}>MESSAGES</Text>
+          <View style={styles.card}>
+            <PressableScale haptic={false} onPress={() => setStarredOpen(true)}>
+              <Row icon="star" label="Starred messages" sub={`${starredMsgs.length} starred`}>
+                <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
+              </Row>
+            </PressableScale>
           </View>
         </Animated.View>
 
@@ -158,6 +173,37 @@ export default function ProfileScreen({ navigation }: any) {
       </Modal>
 
       {/* blocked users modal */}
+      {/* starred messages modal */}
+      <Modal visible={starredOpen} transparent animationType="fade" onRequestClose={() => setStarredOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <Animated.View entering={ZoomIn.duration(200)} style={[styles.modal, { maxHeight: 480 }]}>
+            <Text style={styles.modalTitle}>⭐ Starred messages</Text>
+            {starredMsgs.length === 0 && (
+              <Text style={styles.emptyText}>Long-press any message → Star to save it here.</Text>
+            )}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {starredMsgs.map((m) => {
+                const from = m.senderId === 'me' ? 'You' : contacts.find((c) => c.id === m.senderId)?.name ?? 'Member';
+                return (
+                  <View key={m.id} style={styles.starredRow}>
+                    <Text style={styles.starredFrom}>{from}</Text>
+                    <Text style={styles.starredText} numberOfLines={3}>
+                      {m.imageUri || m.imageUrl ? '📷 Photo' : m.audioUri || m.audioUrl ? '🎙️ Voice message' : m.text}
+                    </Text>
+                    <Text style={styles.starredDate}>
+                      {new Date(m.sentAt).toLocaleDateString([], { day: 'numeric', month: 'short' })}
+                    </Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <PressableScale haptic={false} style={[styles.modalBtn, { marginTop: 12 }]} onPress={() => setStarredOpen(false)}>
+              <Text style={styles.modalBtnText}>Close</Text>
+            </PressableScale>
+          </Animated.View>
+        </View>
+      </Modal>
+
       <Modal visible={blockedOpen} transparent animationType="fade" onRequestClose={() => setBlockedOpen(false)}>
         <View style={styles.modalBackdrop}>
           <Animated.View entering={ZoomIn.duration(200)} style={styles.modal}>
@@ -273,4 +319,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 7,
   },
   unblockText: { color: colors.redHot, fontSize: 12.5, fontFamily: fonts.semiBold },
+  starredRow: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+  },
+  starredFrom: { color: colors.yellow, fontSize: 12.5, fontFamily: fonts.semiBold },
+  starredText: { color: colors.white, fontSize: 14, fontFamily: fonts.regular, marginTop: 3 },
+  starredDate: { color: colors.textTertiary, fontSize: 11, fontFamily: fonts.regular, marginTop: 3 },
 });
