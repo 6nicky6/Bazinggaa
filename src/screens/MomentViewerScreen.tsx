@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -20,6 +20,10 @@ export default function MomentViewerScreen({ navigation, route }: any) {
   const profile = useAppStore((s) => s.profile);
   const viewMoment = useAppStore((s) => s.viewMoment);
   const deleteMoment = useAppStore((s) => s.deleteMoment);
+  const ensureChat = useAppStore((s) => s.ensureChat);
+  const sendMessage = useAppStore((s) => s.sendMessage);
+  const [reply, setReply] = useState('');
+  const [sentNote, setSentNote] = useState('');
 
   const moments = useMemo(
     () => liveMoments(momentsAll).filter((m) => m.authorId === authorId).sort((a, b) => a.createdAt - b.createdAt),
@@ -115,7 +119,7 @@ export default function MomentViewerScreen({ navigation, route }: any) {
           <Pressable style={styles.tapRight} onPress={next} />
         </View>
 
-        {/* footer */}
+        {/* footer: views (mine) or react + reply (theirs) */}
         <View style={styles.footer}>
           {isMe ? (
             <View style={styles.viewsPill}>
@@ -123,7 +127,54 @@ export default function MomentViewerScreen({ navigation, route }: any) {
               <Text style={styles.viewsText}>{moment.views.filter((v) => v !== 'me').length} views</Text>
             </View>
           ) : (
-            <Text style={styles.replyHint}>Tap sides to navigate</Text>
+            <>
+              <View style={styles.reactRow}>
+                {['❤️', '🔥', '😂', '👏'].map((e) => (
+                  <PressableScale
+                    key={e}
+                    scaleTo={0.75}
+                    style={styles.reactBtn}
+                    onPress={async () => {
+                      const cid = await ensureChat(authorId);
+                      if (cid) {
+                        sendMessage(cid, `${e} Reacted to your Moment: “${moment.text.slice(0, 40)}${moment.text.length > 40 ? '…' : ''}”`);
+                        setSentNote(`${e} sent to ${author?.name ?? 'them'}`);
+                        setTimeout(() => setSentNote(''), 1800);
+                      }
+                    }}
+                  >
+                    <Text style={{ fontSize: 24 }}>{e}</Text>
+                  </PressableScale>
+                ))}
+              </View>
+              <View style={styles.replyRow}>
+                <TextInput
+                  style={styles.replyInput}
+                  value={reply}
+                  onChangeText={setReply}
+                  placeholder={`Reply to ${author?.name ?? 'Moment'}…`}
+                  placeholderTextColor="rgba(255,255,255,0.6)"
+                />
+                <PressableScale
+                  scaleTo={0.85}
+                  style={styles.replySend}
+                  onPress={async () => {
+                    const t = reply.trim();
+                    if (!t) return;
+                    const cid = await ensureChat(authorId);
+                    if (cid) {
+                      sendMessage(cid, `💬 Re your Moment “${moment.text.slice(0, 30)}${moment.text.length > 30 ? '…' : ''}”: ${t}`);
+                      setReply('');
+                      setSentNote('Reply sent — check your chat 💬');
+                      setTimeout(() => setSentNote(''), 1800);
+                    }
+                  }}
+                >
+                  <Ionicons name="send" size={16} color={colors.black} />
+                </PressableScale>
+              </View>
+              {!!sentNote && <Text style={styles.sentNote}>{sentNote}</Text>}
+            </>
           )}
         </View>
       </LinearGradient>
@@ -161,4 +212,24 @@ const styles = StyleSheet.create({
   },
   viewsText: { color: colors.white, fontSize: 13, fontFamily: fonts.medium },
   replyHint: { color: 'rgba(255,255,255,0.55)', fontSize: 12, fontFamily: fonts.regular },
+  reactRow: { flexDirection: 'row', justifyContent: 'center', gap: 22, marginBottom: 12 },
+  reactBtn: { padding: 6 },
+  replyRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 18, marginBottom: 4,
+  },
+  replyInput: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.35)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', borderRadius: 22,
+    color: colors.white, fontSize: 14.5, fontFamily: fonts.regular,
+    paddingHorizontal: 16, paddingVertical: 10,
+  },
+  replySend: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.yellow,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  sentNote: {
+    color: colors.white, fontSize: 12.5, fontFamily: fonts.medium,
+    textAlign: 'center', marginTop: 8,
+  },
 });
