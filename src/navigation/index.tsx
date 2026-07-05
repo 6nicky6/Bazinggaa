@@ -23,6 +23,7 @@ import MomentComposerScreen from '../screens/MomentComposerScreen';
 import MomentViewerScreen from '../screens/MomentViewerScreen';
 import DiscoverScreen from '../screens/DiscoverScreen';
 import CallOverlay from '../screens/CallOverlay';
+import BazinggaPlusScreen from '../screens/BazinggaPlusScreen';
 import CallsScreen from '../screens/CallsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 
@@ -144,6 +145,11 @@ export default function RootNavigator() {
               name="MomentViewer"
               component={MomentViewerScreen}
               options={{ animation: 'fade' }}
+            />
+            <Stack.Screen
+              name="BazinggaPlus"
+              component={BazinggaPlusScreen}
+              options={{ animation: 'slide_from_bottom' }}
             />
           </>
         )}

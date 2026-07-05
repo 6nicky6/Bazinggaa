@@ -108,6 +108,18 @@ export default function ProfileScreen({ navigation }: any) {
           </View>
         </Animated.View>
 
+        {/* bazingga+ */}
+        <Animated.View entering={FadeInDown.delay(145).duration(450)}>
+          <Text style={styles.section}>BAZINGGA+</Text>
+          <View style={styles.card}>
+            <PressableScale haptic={false} onPress={() => navigation.navigate('BazinggaPlus')}>
+              <Row icon="flash" label="Bazingga+" sub="Premium themes, unlimited AI & more — coming at launch">
+                <Ionicons name="chevron-forward" size={17} color={colors.yellow} />
+              </Row>
+            </PressableScale>
+          </View>
+        </Animated.View>
+
         {/* privacy */}
         <Animated.View entering={FadeInDown.delay(160).duration(450)}>
           <Text style={styles.section}>PRIVACY & SAFETY</Text>
