@@ -148,7 +148,8 @@ export async function loadAll(): Promise<LiveData | null> {
       gradient: gradFor(p.avatar_gradient),
       initials: (p.avatar_emoji as string) || (p.name?.[0] ?? '?').toUpperCase(),
       group: 'Friends',
-      online: false,
+      online: false, // presence channel flips this in the store
+      lastSeenAt: p.last_seen_at ? new Date(p.last_seen_at).getTime() : undefined,
     }));
 
     // my chats: direct → other member = contactId; group/channel → name/icon/members
@@ -431,6 +432,68 @@ export async function updateCallLive(callId: string, status: 'accepted' | 'decli
     .from('calls')
     .update({ status, ...(status !== 'accepted' ? { ended_at: new Date().toISOString() } : {}) })
     .eq('id', callId);
+}
+
+// ---------- presence + read receipts ----------
+export async function markReadLive(chatId: string) {
+  if (!supabase) return;
+  const uid = await myUserId();
+  if (!uid) return;
+  await supabase
+    .from('messages')
+    .update({ read_at: new Date().toISOString() })
+    .eq('chat_id', chatId)
+    .neq('sender_id', uid)
+    .is('read_at', null);
+}
+
+export async function updateLastSeen() {
+  if (!supabase) return;
+  const uid = await myUserId();
+  if (!uid) return;
+  // tolerant: column lands with schema v3
+  const { error } = await supabase
+    .from('profiles')
+    .update({ last_seen_at: new Date().toISOString() })
+    .eq('id', uid);
+  if (error && !/last_seen_at/.test(error.message)) console.warn('[live] lastSeen:', error.message);
+}
+
+// Realtime Presence: who's online right now + typing broadcasts.
+export function joinPresence(handlers: {
+  onOnline: (ids: string[]) => void;
+  onTyping: (chatId: string, fromId: string) => void;
+}): { sendTyping: (chatId: string) => void; cleanup: () => void } {
+  const sb = supabase;
+  if (!sb) return { sendTyping: () => {}, cleanup: () => {} };
+  let uid: string | null = null;
+  const ch = sb.channel('bazingga-presence', { config: { presence: { key: 'presence' } } });
+  ch.on('presence', { event: 'sync' }, () => {
+    const state = ch.presenceState() as Record<string, { uid?: string }[]>;
+    const ids = new Set<string>();
+    for (const metas of Object.values(state)) {
+      for (const m of metas) if (m.uid) ids.add(m.uid);
+    }
+    handlers.onOnline([...ids]);
+  });
+  ch.on('broadcast', { event: 'typing' }, (payload) => {
+    const p = payload.payload as { chatId?: string; uid?: string };
+    if (p?.chatId && p?.uid && p.uid !== uid) handlers.onTyping(p.chatId, p.uid);
+  });
+  ch.subscribe(async (status) => {
+    if (status === 'SUBSCRIBED') {
+      uid = await myUserId();
+      if (uid) ch.track({ uid, online_at: new Date().toISOString() });
+    }
+  });
+  return {
+    sendTyping: (chatId: string) => {
+      if (uid) ch.send({ type: 'broadcast', event: 'typing', payload: { chatId, uid } });
+    },
+    cleanup: () => {
+      sb.removeChannel(ch);
+    },
+  };
 }
 
 // ---------- realtime ----------

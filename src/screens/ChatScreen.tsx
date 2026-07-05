@@ -20,6 +20,14 @@ import { reportLive } from '../services/live';
 import { backendMode } from '../services/supabase';
 import { Message } from '../types';
 
+function lastSeenStr(ts: number) {
+  const mins = Math.round((Date.now() - ts) / 60_000);
+  if (mins < 2) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60 * 24) return `${Math.round(mins / 60)}h ago`;
+  return new Date(ts).toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
 function timeStr(ts: number) {
   const d = new Date(ts);
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -57,6 +65,7 @@ export default function ChatScreen({ navigation, route }: any) {
   const typing = useAppStore((s) => s.typing[chatId]);
   const sendMessage = useAppStore((s) => s.sendMessage);
   const markChatRead = useAppStore((s) => s.markChatRead);
+  const notifyTyping = useAppStore((s) => s.notifyTyping);
   const retryMessage = useAppStore((s) => s.retryMessage);
   const reactToMessage = useAppStore((s) => s.reactToMessage);
   const deleteMessage = useAppStore((s) => s.deleteMessage);
@@ -219,9 +228,13 @@ export default function ChatScreen({ navigation, route }: any) {
               ? 'blocked'
               : typing
               ? 'typing…'
+              : contact?.online
+              ? 'online'
+              : contact?.lastSeenAt
+              ? `last seen ${lastSeenStr(contact.lastSeenAt)}`
               : backendMode === 'demo'
-              ? contact?.online ? 'online' : 'last seen recently'
-              : 'on Bazingga' /* live: honest until real presence ships */}
+              ? 'last seen recently'
+              : 'on Bazingga'}
           </Text>
         </View>
         {!isGroup && contact && (
@@ -424,7 +437,10 @@ export default function ChatScreen({ navigation, route }: any) {
               <TextInput
                 style={styles.input}
                 value={draft}
-                onChangeText={setDraft}
+                onChangeText={(t) => {
+                  setDraft(t);
+                  if (t.trim()) notifyTyping(chatId);
+                }}
                 placeholder="Message"
                 placeholderTextColor={colors.textTertiary}
                 multiline

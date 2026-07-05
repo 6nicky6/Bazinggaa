@@ -27,6 +27,7 @@ export type Contact = {
   initials: string;
   group: 'Friends' | 'Family' | 'Work';
   online: boolean;
+  lastSeenAt?: number;
 };
 
 export type Chat = {

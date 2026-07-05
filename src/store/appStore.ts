@@ -44,6 +44,12 @@ let idc = 0;
 const uid = () => `${Date.now().toString(36)}-${(idc++).toString(36)}`;
 let liveUnsub: (() => void) | null = null;
 let livePoll: number | null = null;
+let presenceHandle: { sendTyping: (chatId: string) => void; cleanup: () => void } | null = null;
+let lastSeenTimer: number | null = null;
+const typingTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+const lastTypingSent: Record<string, number> = {};
+const lastReadSync: Record<string, number> = {};
+const STATUS_RANK: Record<string, number> = { sending: 0, failed: 0, sent: 1, delivered: 2, read: 3 };
 
 // Merge server messages with local state without losing still-sending
 // optimistic messages or duplicating anything. Keyed by id, sorted by time.
@@ -55,13 +61,21 @@ function mergeMessages(incoming: Message[], current: Message[]): Message[] {
     if (!existing) {
       byId.set(m.id, m);
     } else if (existing.status !== 'sending' && existing.status !== 'failed') {
-      // adopt server-side parity changes (others' reactions, remote deletes)
-      // without downgrading local read state
+      // adopt server-side changes: others' reactions, remote deletes, and
+      // forward-only status upgrades (sent -> delivered -> read = real ticks)
+      const statusUpgrade = STATUS_RANK[m.status] > STATUS_RANK[existing.status];
       if (
+        statusUpgrade ||
         JSON.stringify(m.reactions ?? null) !== JSON.stringify(existing.reactions ?? null) ||
         !!m.deleted !== !!existing.deleted
       ) {
-        byId.set(m.id, { ...existing, reactions: m.reactions, deleted: m.deleted, text: m.deleted ? '' : existing.text });
+        byId.set(m.id, {
+          ...existing,
+          status: statusUpgrade ? m.status : existing.status,
+          reactions: m.reactions,
+          deleted: m.deleted,
+          text: m.deleted ? '' : existing.text,
+        });
       }
     }
   }
@@ -106,6 +120,7 @@ type State = {
   answerCall: (accept: boolean) => void;
   endCall: () => void;
   markChatRead: (chatId: string) => void;
+  notifyTyping: (chatId: string) => void;
   ensureChat: (contactId: string) => Promise<string | null>;
   createGroup: (kind: 'group' | 'channel', name: string, icon: string, memberIds: string[]) => Promise<string | null>;
   joinChannel: (ch: OfficialChannel) => string;
@@ -226,6 +241,9 @@ export const useAppStore = create<State>()(
           liveUnsub?.();
           liveUnsub = null;
           if (livePoll) { clearInterval(livePoll); livePoll = null; }
+          presenceHandle?.cleanup();
+          presenceHandle = null;
+          if (lastSeenTimer) { clearInterval(lastSeenTimer); lastSeenTimer = null; }
           live.signOutLive();
           set({
             authed: false, profile: defaultProfile,
@@ -399,8 +417,26 @@ export const useAppStore = create<State>()(
         get().sendMessage(toChatId, msg.text, { forwarded: true });
       },
 
-      markChatRead: (chatId) =>
-        set((st) => ({ lastReadAt: { ...st.lastReadAt, [chatId]: Date.now() } })),
+      markChatRead: (chatId) => {
+        set((st) => ({ lastReadAt: { ...st.lastReadAt, [chatId]: Date.now() } }));
+        // read receipts: tell the sender their message was seen (throttled)
+        if (isLive && chatId !== BOT_ID && !chatId.startsWith('official-')) {
+          const now = Date.now();
+          if (now - (lastReadSync[chatId] ?? 0) > 2500) {
+            lastReadSync[chatId] = now;
+            live.markReadLive(chatId);
+          }
+        }
+      },
+
+      notifyTyping: (chatId) => {
+        if (!isLive || chatId === BOT_ID || chatId.startsWith('official-')) return;
+        const now = Date.now();
+        if (now - (lastTypingSent[chatId] ?? 0) > 2500) {
+          lastTypingSent[chatId] = now;
+          presenceHandle?.sendTyping(chatId);
+        }
+      },
 
       ensureChat: async (contactId) => {
         const existing = get().chats.find((c) => c.contactId === contactId);
@@ -577,6 +613,29 @@ export const useAppStore = create<State>()(
             }
           },
         });
+
+        // PRESENCE: real online status + typing across devices
+        presenceHandle?.cleanup();
+        presenceHandle = live.joinPresence({
+          onOnline: (ids) => {
+            const online = new Set(ids);
+            set((st) => ({
+              contacts: st.contacts.map((c) =>
+                c.id === BOT_ID ? c : { ...c, online: online.has(c.id) }
+              ),
+            }));
+          },
+          onTyping: (tChatId, fromId) => {
+            set((st) => ({ typing: { ...st.typing, [tChatId]: true } }));
+            if (typingTimers[tChatId]) clearTimeout(typingTimers[tChatId]);
+            typingTimers[tChatId] = setTimeout(() => {
+              set((st) => ({ typing: { ...st.typing, [tChatId]: false } }));
+            }, 3500);
+          },
+        });
+        live.updateLastSeen();
+        if (lastSeenTimer) clearInterval(lastSeenTimer);
+        lastSeenTimer = setInterval(() => live.updateLastSeen(), 60_000) as unknown as number;
 
         // RELIABILITY NET: realtime sockets can degrade (esp. during provider
         // incidents). Poll every 3.5s and merge anything new so messages,

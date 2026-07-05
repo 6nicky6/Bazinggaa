@@ -104,3 +104,6 @@ create policy "media upload by authed" on storage.objects
   for insert to authenticated with check (bucket_id = 'media');
 create policy "media read" on storage.objects
   for select using (bucket_id = 'media');
+
+-- 8) PRESENCE: last-seen timestamps (live online status uses realtime presence)
+alter table public.profiles add column if not exists last_seen_at timestamptz;
