@@ -286,9 +286,11 @@ export const useAppStore = create<State>()(
       },
 
       sendImage: (chatId, imageUri) => {
+        const tempId = uid();
+        const isRealChat = isLive && chatId !== BOT_ID && !chatId.startsWith('official-');
         const msg: Message = {
-          id: uid(), chatId, senderId: 'me', text: '', imageUri,
-          sentAt: Date.now(), status: 'sent',
+          id: tempId, chatId, senderId: 'me', text: '', imageUri,
+          sentAt: Date.now(), status: isRealChat ? 'sending' : 'sent',
         };
         set((st) => ({ messages: [...st.messages, msg] }));
         if (chatId === BOT_ID) {
@@ -301,13 +303,42 @@ export const useAppStore = create<State>()(
           })), 1200);
         } else if (!isLive) {
           scheduleAutoReply(chatId, 'sent you a photo 📸');
+        } else if (isRealChat) {
+          // upload to Storage, then send the message with the remote URL so it
+          // arrives on the other person's phone
+          live.uploadImage(chatId, imageUri).then(async (url) => {
+            if (!url) {
+              // storage not ready (pre-v3) or offline — keep local, mark failed
+              set((st) => ({
+                messages: st.messages.map((m) =>
+                  m.id === tempId ? { ...m, status: 'failed' as const } : m
+                ),
+              }));
+              return;
+            }
+            const serverMsg = await live.sendMessageLive(chatId, '📷 Photo', { imageUrl: url });
+            set((st) => ({
+              messages: st.messages.map((m) =>
+                m.id === tempId
+                  ? serverMsg
+                    ? { ...serverMsg, imageUri, text: '' }
+                    : { ...m, status: 'failed' as const }
+                  : m
+              ),
+            }));
+          });
         }
-        // live: image stays on-device until media sync ships (bubble shows a note)
       },
 
       retryMessage: (messageId: string) => {
         const msg = get().messages.find((m) => m.id === messageId);
         if (!msg || msg.status !== 'failed') return;
+        if (msg.imageUri && !msg.imageUrl) {
+          // failed photo: remove the tombstone and re-run the upload pipeline
+          set((st) => ({ messages: st.messages.filter((m) => m.id !== messageId) }));
+          get().sendImage(msg.chatId, msg.imageUri);
+          return;
+        }
         set((st) => ({
           messages: st.messages.map((m) =>
             m.id === messageId ? { ...m, status: 'sending' as const, sentAt: Date.now() } : m

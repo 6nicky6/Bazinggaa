@@ -95,3 +95,12 @@ alter table public.messages add column if not exists reply_to uuid references pu
 alter table public.messages add column if not exists reactions jsonb not null default '{}'::jsonb;
 alter table public.messages add column if not exists deleted boolean not null default false;
 alter table public.messages add column if not exists forwarded boolean not null default false;
+
+-- 7) MEDIA: image messages + storage bucket
+alter table public.messages add column if not exists image_url text;
+insert into storage.buckets (id, name, public) values ('media', 'media', true)
+  on conflict (id) do nothing;
+create policy "media upload by authed" on storage.objects
+  for insert to authenticated with check (bucket_id = 'media');
+create policy "media read" on storage.objects
+  for select using (bucket_id = 'media');

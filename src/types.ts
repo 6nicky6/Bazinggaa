@@ -8,7 +8,8 @@ export type Message = {
   chatId: string;
   senderId: string; // 'me' or contact id
   text: string;
-  imageUri?: string; // local uri (media sync to server ships later)
+  imageUri?: string; // local uri (sender's device)
+  imageUrl?: string; // remote uri (synced via Supabase Storage — arrives on both sides)
   sentAt: number;
   status: MessageStatus;
   replyToId?: string; // quoted message id

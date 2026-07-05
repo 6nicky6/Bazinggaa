@@ -283,11 +283,11 @@ export default function ChatScreen({ navigation, route }: any) {
               )}
               {m.deleted ? (
                 <Text style={styles.deletedText}>🚫 This message was deleted</Text>
-              ) : m.imageUri ? (
+              ) : m.imageUrl || m.imageUri ? (
                 <>
-                  <Image source={{ uri: m.imageUri }} style={styles.msgImage} resizeMode="cover" />
-                  {backendMode === 'live' && (
-                    <Text style={styles.imageNote}>On your device · photo sync ships next update</Text>
+                  <Image source={{ uri: m.imageUrl ?? m.imageUri }} style={styles.msgImage} resizeMode="cover" />
+                  {backendMode === 'live' && !m.imageUrl && m.status !== 'sending' && (
+                    <Text style={styles.imageNote}>Not synced · tap to retry</Text>
                   )}
                 </>
               ) : (
