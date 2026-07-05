@@ -75,6 +75,8 @@ export default function ChatScreen({ navigation, route }: any) {
   const toggleStar = useAppStore((s) => s.toggleStar);
   const toggleMute = useAppStore((s) => s.toggleMute);
   const setWallpaper = useAppStore((s) => s.setWallpaper);
+  const circles = useAppStore((s) => s.circles);
+  const toggleCircle = useAppStore((s) => s.toggleCircle);
   const allChats = useAppStore((s) => s.chats);
   const startCall = useAppStore((s) => s.startCall);
   const block = useAppStore((s) => s.block);
@@ -568,6 +570,34 @@ export default function ChatScreen({ navigation, route }: any) {
               />
               <Text style={styles.menuText}>{chat?.muted ? 'Unmute' : 'Mute'}</Text>
             </PressableScale>
+            {(['close', 'family'] as const).map((circle) => {
+              const inCircle = circles[circle].includes(contact.id);
+              return (
+                <PressableScale
+                  key={circle}
+                  haptic={false}
+                  style={styles.menuItem}
+                  onPress={() => {
+                    toggleCircle(contact.id, circle);
+                    setMenuOpen(false);
+                    showToast(
+                      inCircle
+                        ? `Removed from ${circle === 'close' ? 'Close Friends' : 'Family'}`
+                        : `Added to ${circle === 'close' ? 'Close Friends ⭐' : 'Family 🏠'}`
+                    );
+                  }}
+                >
+                  <Ionicons
+                    name={circle === 'close' ? (inCircle ? 'star' : 'star-outline') : (inCircle ? 'home' : 'home-outline')}
+                    size={18}
+                    color={inCircle ? colors.yellow : colors.textSecondary}
+                  />
+                  <Text style={styles.menuText}>
+                    {circle === 'close' ? 'Close Friends' : 'Family Circle'}{inCircle ? ' ✓' : ''}
+                  </Text>
+                </PressableScale>
+              );
+            })}
             <View style={styles.wallpaperRow}>
               <Ionicons name="color-palette-outline" size={18} color={colors.textSecondary} />
               <Text style={styles.menuText}>Wallpaper</Text>

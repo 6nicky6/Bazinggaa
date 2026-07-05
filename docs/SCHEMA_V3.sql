@@ -114,3 +114,26 @@ alter table public.messages add column if not exists audio_duration int;
 
 -- 10) PROFILE PHOTOS
 alter table public.profiles add column if not exists avatar_url text;
+
+-- 11) CIRCLES + MOMENT AUDIENCE (Close Friends / Family)
+create table if not exists public.circles (
+  owner_id uuid references public.profiles on delete cascade,
+  member_id uuid references public.profiles on delete cascade,
+  circle text not null check (circle in ('close','family')),
+  primary key (owner_id, member_id, circle)
+);
+alter table public.circles enable row level security;
+create policy "circles owner only" on public.circles
+  for all to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+alter table public.moments add column if not exists audience text not null default 'everyone'
+  check (audience in ('everyone','close','family'));
+drop policy if exists "moments readable while live" on public.moments;
+create policy "moments readable while live" on public.moments
+  for select to authenticated using (
+    expires_at > now() and (
+      author_id = auth.uid()
+      or audience = 'everyone'
+      or exists (select 1 from circles c where c.owner_id = author_id
+                 and c.member_id = auth.uid() and c.circle = audience)
+    )
+  );

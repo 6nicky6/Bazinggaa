@@ -383,11 +383,31 @@ export async function sendMessageLive(
 }
 
 // ---------- moments ops ----------
-export async function postMomentLive(text: string, gradient: readonly [string, string]) {
+export async function postMomentLive(
+  text: string,
+  gradient: readonly [string, string],
+  audience: 'everyone' | 'close' | 'family' = 'everyone'
+) {
   if (!supabase) return;
   const uid = await myUserId();
   if (!uid) return;
-  await supabase.from('moments').insert({ author_id: uid, content: text, gradient: gradIndex(gradient) });
+  const base = { author_id: uid, content: text, gradient: gradIndex(gradient) };
+  const { error } = await supabase.from('moments').insert({ ...base, audience });
+  if (error) await supabase.from('moments').insert(base); // pre-v3: no audience column
+}
+
+// circles: owner-only lists powering moment audiences (tolerant pre-v3)
+export async function setCircleLive(memberId: string, circle: 'close' | 'family', member: boolean) {
+  if (!supabase) return;
+  const uid = await myUserId();
+  if (!uid) return;
+  try {
+    if (member) {
+      await supabase.from('circles').upsert({ owner_id: uid, member_id: memberId, circle });
+    } else {
+      await supabase.from('circles').delete().match({ owner_id: uid, member_id: memberId, circle });
+    }
+  } catch {}
 }
 
 export async function viewMomentLive(momentId: string) {

@@ -57,6 +57,8 @@ export type CallState = {
   startedAt: number;
 };
 
+export type MomentAudience = 'everyone' | 'close' | 'family';
+
 export type Moment = {
   id: string;
   authorId: string; // 'me' or contact id
@@ -65,6 +67,7 @@ export type Moment = {
   createdAt: number;
   expiresAt: number;
   views: string[]; // viewer ids
+  audience?: MomentAudience;
 };
 
 export type CallLog = {

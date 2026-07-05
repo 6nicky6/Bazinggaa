@@ -19,10 +19,16 @@ export default function MomentComposerScreen({ navigation }: any) {
   const postMoment = useAppStore((s) => s.postMoment);
   const [text, setText] = useState('');
   const [grad, setGrad] = useState<readonly [string, string]>(gradients.avatar1);
+  const [audience, setAudience] = useState<'everyone' | 'close' | 'family'>('everyone');
+  const AUDIENCES = [
+    { key: 'everyone' as const, label: 'Everyone', icon: 'earth' as const },
+    { key: 'close' as const, label: 'Close Friends', icon: 'star' as const },
+    { key: 'family' as const, label: 'Family', icon: 'home' as const },
+  ];
 
   const post = () => {
     if (!text.trim()) return;
-    postMoment(text.trim(), grad);
+    postMoment(text.trim(), grad, audience);
     navigation.goBack();
   };
 
@@ -51,6 +57,22 @@ export default function MomentComposerScreen({ navigation }: any) {
         </View>
 
         <Animated.View entering={FadeInUp.duration(400)} style={styles.bottom}>
+          <View style={styles.audienceRow}>
+            {AUDIENCES.map((a) => (
+              <PressableScale
+                key={a.key}
+                haptic={false}
+                scaleTo={0.92}
+                style={[styles.audiencePill, audience === a.key && styles.audiencePillActive]}
+                onPress={() => setAudience(a.key)}
+              >
+                <Ionicons name={a.icon} size={13} color={audience === a.key ? colors.black : colors.white} />
+                <Text style={[styles.audienceText, audience === a.key && { color: colors.black }]}>
+                  {a.label}
+                </Text>
+              </PressableScale>
+            ))}
+          </View>
           <View style={styles.gradRow}>
             {GRADS.map((g, i) => (
               <PressableScale key={i} onPress={() => setGrad(g)} scaleTo={0.85}>
@@ -94,6 +116,14 @@ const styles = StyleSheet.create({
   },
   bottom: { paddingHorizontal: 24, paddingBottom: 38 },
   gradRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 18 },
+  audienceRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 14 },
+  audiencePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.35)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)',
+    borderRadius: 18, paddingHorizontal: 12, paddingVertical: 7,
+  },
+  audiencePillActive: { backgroundColor: colors.white, borderColor: colors.white },
+  audienceText: { color: colors.white, fontSize: 12.5, fontFamily: fonts.semiBold },
   swatch: {
     width: 32, height: 32, borderRadius: 16,
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.35)',

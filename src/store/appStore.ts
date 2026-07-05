@@ -3,7 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { gradients } from '../theme/colors';
 import {
-  CallLog, CallState, Chat, Contact, Message, Moment, Profile,
+  CallLog, CallState, Chat, Contact, Message, Moment, MomentAudience, Profile,
 } from '../types';
 import {
   CONTACTS, pickReply, seedCalls, seedMessages, seedMoments,
@@ -135,7 +135,9 @@ type State = {
   deleteChat: (chatId: string) => void;
   block: (contactId: string) => void;
   unblock: (contactId: string) => void;
-  postMoment: (text: string, gradient: readonly [string, string]) => void;
+  postMoment: (text: string, gradient: readonly [string, string], audience?: MomentAudience) => void;
+  circles: { close: string[]; family: string[] };
+  toggleCircle: (contactId: string, circle: 'close' | 'family') => void;
   viewMoment: (momentId: string) => void;
   deleteMoment: (momentId: string) => void;
   setSetting: (k: 'smartReplies' | 'notifications', v: boolean) => void;
@@ -757,18 +759,33 @@ export const useAppStore = create<State>()(
         if (isLive) live.unblockLive(contactId);
       },
 
-      postMoment: (text, gradient) => {
+      postMoment: (text, gradient, audience = 'everyone') => {
         set((st) => ({
           moments: [
             {
-              id: uid(), authorId: 'me', text, gradient,
+              id: uid(), authorId: 'me', text, gradient, audience,
               createdAt: Date.now(), expiresAt: Date.now() + 24 * 3_600_000,
               views: [],
             },
             ...st.moments,
           ],
         }));
-        if (isLive) live.postMomentLive(text, gradient); // realtime refresh syncs real id
+        if (isLive) live.postMomentLive(text, gradient, audience); // realtime refresh syncs real id
+      },
+
+      circles: { close: [], family: [] },
+      toggleCircle: (contactId, circle) => {
+        const cur = get().circles[circle];
+        const member = !cur.includes(contactId);
+        set((st) => ({
+          circles: {
+            ...st.circles,
+            [circle]: member
+              ? [...st.circles[circle], contactId]
+              : st.circles[circle].filter((id) => id !== contactId),
+          },
+        }));
+        if (isLive) live.setCircleLive(contactId, circle, member);
       },
       viewMoment: (momentId) => {
         set((st) => ({
@@ -872,6 +889,7 @@ export const useAppStore = create<State>()(
         blocked: st.blocked,
         lastReadAt: st.lastReadAt,
         settings: st.settings,
+        circles: st.circles,
       }),
       onRehydrateStorage: () => () => {
         useAppStore.setState({ hydrated: true });
