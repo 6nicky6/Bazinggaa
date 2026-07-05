@@ -1,5 +1,10 @@
 # Bazingga Progress Log
 
+### 2026-07-05 — APK #5: notifications + native keyboard (security-reviewed)
+- Did: expo-notifications integrated — permission flow, Android MAX channel, local banner+sound for messages arriving while backgrounded (honors in-app toggle + block list). 25-agent adversarial review before build caught: client-readable push tokens (spoofing risk — moved to owner-only devices table, send deferred to server-side Edge Function), dead-silent push registration (now logs + skips Expo Go), notification toggle/blocklist ignored (fixed). Native keyboard resize baked in. APK #5: https://expo.dev/artifacts/eas/u1NXrsNi_lMYe8KgJFNqdIhbjfw_4wn9dt0b_9TiQEI.apk
+- Broke: Nothing (tsc clean). Full closed-app push needs: Firebase google-services.json + eas credentials + Edge Function (queued behind Supabase recovery + Nikhil's Firebase account click).
+- Next: Nikhil 2-device test (notify, keyboard, receiving); Supabase recovery -> schema v3 (groups/calls/devices) + 6-digit email + Brevo; then parity wave (replies, reactions, delete).
+
 ### 2026-07-04 (night) — ROOT-CAUSE fix: receiving + keyboard (OTA published)
 - Did: Found the real "not receiving" bug via 2-real-account browser testing — loadAll() silently returned 0 chats because it queried v3 columns (role, icon_emoji) that don not exist yet (schema v3 blocked by Supabase outage) -> Supabase errored the whole query -> no conversations loaded. Added graceful column fallback. Also: bootLive now waits for a valid session + sets realtime auth before subscribing; added a 3.5s polling reliability net so messages/moments/calls ALWAYS arrive even when realtime replication is degraded. VERIFIED bidirectional live delivery between Aisha QA and Omar QA in browser. Keyboard: whole-screen KeyboardAvoidingView + app.json softwareKeyboardLayoutMode=resize. Published OTA update group 11415f9d to preview branch (reaches APK #4 on relaunch).
 - Broke: Nothing (tsc clean). Native keyboard resize needs APK #5 (JS lift works OTA meanwhile). Push notifications still need APK #5.
