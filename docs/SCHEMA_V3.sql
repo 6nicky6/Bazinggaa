@@ -89,3 +89,9 @@ create policy "devices owner only" on public.devices
 
 -- 5) USERNAME SEARCH (discovery redesign: find by handle, not list-everyone)
 create index if not exists idx_profiles_username on public.profiles (username);
+
+-- 6) MESSAGE PARITY: replies, reactions, delete-for-everyone, forward
+alter table public.messages add column if not exists reply_to uuid references public.messages;
+alter table public.messages add column if not exists reactions jsonb not null default '{}'::jsonb;
+alter table public.messages add column if not exists deleted boolean not null default false;
+alter table public.messages add column if not exists forwarded boolean not null default false;

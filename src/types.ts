@@ -11,6 +11,10 @@ export type Message = {
   imageUri?: string; // local uri (media sync to server ships later)
   sentAt: number;
   status: MessageStatus;
+  replyToId?: string; // quoted message id
+  reactions?: Record<string, string[]>; // emoji -> reactor ids ('me' or uid)
+  deleted?: boolean; // deleted for everyone
+  forwarded?: boolean;
 };
 
 export type Contact = {

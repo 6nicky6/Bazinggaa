@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, StyleSheet, Text, TextInput, View,
+  FlatList, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -57,6 +58,10 @@ export default function ChatScreen({ navigation, route }: any) {
   const sendMessage = useAppStore((s) => s.sendMessage);
   const markChatRead = useAppStore((s) => s.markChatRead);
   const retryMessage = useAppStore((s) => s.retryMessage);
+  const reactToMessage = useAppStore((s) => s.reactToMessage);
+  const deleteMessage = useAppStore((s) => s.deleteMessage);
+  const forwardMessage = useAppStore((s) => s.forwardMessage);
+  const allChats = useAppStore((s) => s.chats);
   const startCall = useAppStore((s) => s.startCall);
   const block = useAppStore((s) => s.block);
   const blocked = useAppStore((s) => s.blocked);
@@ -85,6 +90,9 @@ export default function ChatScreen({ navigation, route }: any) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState('');
   const [attachOpen, setAttachOpen] = useState(false);
+  const [actionMsg, setActionMsg] = useState<Message | null>(null);
+  const [replyTo, setReplyTo] = useState<Message | null>(null);
+  const [forwardMsg, setForwardMsg] = useState<Message | null>(null);
   const [recording, setRecording] = useState(false);
   const [recLocked, setRecLocked] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
@@ -178,9 +186,10 @@ export default function ChatScreen({ navigation, route }: any) {
   const send = (text?: string) => {
     const t = (text ?? draft).trim();
     if (!t || readOnlyChannel) return;
-    sendMessage(chatId, t);
+    sendMessage(chatId, t, replyTo ? { replyToId: replyTo.id } : undefined);
     setDraft('');
     setChips([]);
+    setReplyTo(null);
   };
 
   if (!display) return null;
@@ -248,56 +257,95 @@ export default function ChatScreen({ navigation, route }: any) {
           }
           const m = item.msg;
           const mine = m.senderId === 'me';
+          const quoted = m.replyToId ? messages.find((x) => x.id === m.replyToId) : undefined;
+          const quotedName = quoted
+            ? quoted.senderId === 'me'
+              ? 'You'
+              : contacts.find((c) => c.id === quoted.senderId)?.name ?? 'Member'
+            : '';
+          const inner = (
+            <>
+              {isGroup && !mine && (
+                <Text style={styles.senderName}>
+                  {contacts.find((c) => c.id === m.senderId)?.name ?? 'Member'}
+                </Text>
+              )}
+              {m.forwarded && !m.deleted && (
+                <Text style={styles.forwardTag}>↪ Forwarded</Text>
+              )}
+              {quoted && !m.deleted && (
+                <View style={styles.quoteBlock}>
+                  <Text style={styles.quoteName}>{quotedName}</Text>
+                  <Text style={styles.quoteText} numberOfLines={2}>
+                    {quoted.deleted ? 'Message deleted' : quoted.imageUri ? '📷 Photo' : quoted.text}
+                  </Text>
+                </View>
+              )}
+              {m.deleted ? (
+                <Text style={styles.deletedText}>🚫 This message was deleted</Text>
+              ) : m.imageUri ? (
+                <>
+                  <Image source={{ uri: m.imageUri }} style={styles.msgImage} resizeMode="cover" />
+                  {backendMode === 'live' && (
+                    <Text style={styles.imageNote}>On your device · photo sync ships next update</Text>
+                  )}
+                </>
+              ) : (
+                <Text style={styles.msgText}>{m.text}</Text>
+              )}
+              <View style={styles.metaRow}>
+                {mine && m.status === 'failed' && (
+                  <Text style={[styles.metaText, { color: colors.yellow }]}>Not sent · tap to retry</Text>
+                )}
+                <Text style={styles.metaText}>{timeStr(m.sentAt)}</Text>
+                {mine && !m.deleted && <Ticks status={m.status} />}
+              </View>
+            </>
+          );
+          const reactionChips = m.reactions && Object.keys(m.reactions).length > 0 && (
+            <View style={[styles.reactionRow, mine && { justifyContent: 'flex-end' }]}>
+              {(Object.entries(m.reactions) as [string, string[]][]).map(([emoji, ids]) => (
+                <PressableScale
+                  key={emoji}
+                  haptic={false}
+                  scaleTo={0.85}
+                  onPress={() => reactToMessage(m.id, emoji)}
+                  style={[styles.reactionChip, ids.includes('me') && styles.reactionChipMine]}
+                >
+                  <Text style={styles.reactionEmoji}>{emoji}</Text>
+                  {ids.length > 1 && <Text style={styles.reactionCount}>{ids.length}</Text>}
+                </PressableScale>
+              ))}
+            </View>
+          );
           return (
             <Animated.View
               entering={mine ? FadeInUp.duration(240).springify().damping(18) : FadeInDown.duration(240)}
-              style={[styles.bubbleRow, mine && { justifyContent: 'flex-end' }]}
             >
-              {mine ? (
-                <PressableScale
-                  haptic={m.status === 'failed'}
-                  disabled={m.status !== 'failed'}
-                  onPress={() => retryMessage(m.id)}
+              <View style={[styles.bubbleRow, mine && { justifyContent: 'flex-end' }]}>
+                <Pressable
+                  onLongPress={() => !m.deleted && setActionMsg(m)}
+                  delayLongPress={300}
+                  onPress={() => mine && m.status === 'failed' && retryMessage(m.id)}
                   style={{ maxWidth: '78%' }}
                 >
-                  <LinearGradient
-                    colors={gradients.primary}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={[styles.bubble, styles.bubbleMine, { maxWidth: '100%' }, m.status === 'failed' && { opacity: 0.7 }]}
-                  >
-                    {m.imageUri ? (
-                      <>
-                        <Image source={{ uri: m.imageUri }} style={styles.msgImage} resizeMode="cover" />
-                        {backendMode === 'live' && (
-                          <Text style={styles.imageNote}>On your device · photo sync ships next update</Text>
-                        )}
-                      </>
-                    ) : (
-                      <Text style={styles.msgText}>{m.text}</Text>
-                    )}
-                    <View style={styles.metaRow}>
-                      {m.status === 'failed' && (
-                        <Text style={[styles.metaText, { color: colors.yellow }]}>Not sent · tap to retry</Text>
-                      )}
-                      <Text style={styles.metaText}>{timeStr(m.sentAt)}</Text>
-                      <Ticks status={m.status} />
+                  {mine && !m.deleted ? (
+                    <LinearGradient
+                      colors={gradients.primary}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={[styles.bubble, styles.bubbleMine, { maxWidth: '100%' }, m.status === 'failed' && { opacity: 0.7 }]}
+                    >
+                      {inner}
+                    </LinearGradient>
+                  ) : (
+                    <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs, m.deleted && styles.bubbleDeleted]}>
+                      {inner}
                     </View>
-                  </LinearGradient>
-                </PressableScale>
-              ) : (
-                <View style={[styles.bubble, styles.bubbleTheirs]}>
-                  {isGroup && (
-                    <Text style={styles.senderName}>
-                      {contacts.find((c) => c.id === m.senderId)?.name ?? 'Member'}
-                    </Text>
                   )}
-                  <Text style={styles.msgText}>{m.text}</Text>
-                  <View style={styles.metaRow}>
-                    <Text style={styles.metaText}>{timeStr(m.sentAt)}</Text>
-                  </View>
-                </View>
-              )}
+                </Pressable>
+              </View>
+              {reactionChips}
             </Animated.View>
           );
         }}
@@ -311,6 +359,24 @@ export default function ChatScreen({ navigation, route }: any) {
           ) : null
         }
       />
+
+      {/* Reply preview bar */}
+      {replyTo && (
+        <Animated.View entering={FadeInUp.duration(200)} style={styles.replyBar}>
+          <View style={styles.replyBarLine} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quoteName}>
+              {replyTo.senderId === 'me' ? 'You' : contacts.find((c) => c.id === replyTo.senderId)?.name ?? 'Member'}
+            </Text>
+            <Text style={styles.quoteText} numberOfLines={1}>
+              {replyTo.imageUri ? '📷 Photo' : replyTo.text}
+            </Text>
+          </View>
+          <PressableScale haptic={false} onPress={() => setReplyTo(null)} style={styles.replyClose}>
+            <Ionicons name="close" size={18} color={colors.textSecondary} />
+          </PressableScale>
+        </Animated.View>
+      )}
 
       {/* Smart reply chips */}
       {chips.length > 0 && !isBlocked && (
@@ -433,6 +499,90 @@ export default function ChatScreen({ navigation, route }: any) {
       </Modal>
       )}
 
+      {/* Message action sheet: react / reply / forward / copy / delete */}
+      <Modal visible={!!actionMsg} transparent animationType="fade" onRequestClose={() => setActionMsg(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setActionMsg(null)}>
+          <Animated.View entering={FadeInUp.duration(200).springify()} style={styles.sheet}>
+            <View style={styles.reactPickRow}>
+              {['❤️', '😂', '👍', '😮', '😢', '🙏'].map((e) => (
+                <PressableScale
+                  key={e}
+                  scaleTo={0.8}
+                  style={styles.reactPick}
+                  onPress={() => {
+                    if (actionMsg) reactToMessage(actionMsg.id, e);
+                    setActionMsg(null);
+                  }}
+                >
+                  <Text style={{ fontSize: 26 }}>{e}</Text>
+                </PressableScale>
+              ))}
+            </View>
+            <SheetItem icon="arrow-undo-outline" label="Reply" onPress={() => { setReplyTo(actionMsg); setActionMsg(null); }} />
+            <SheetItem icon="arrow-redo-outline" label="Forward" onPress={() => { setForwardMsg(actionMsg); setActionMsg(null); }} />
+            {!actionMsg?.imageUri && (
+              <SheetItem
+                icon="copy-outline"
+                label="Copy"
+                onPress={async () => {
+                  try { await Clipboard.setStringAsync(actionMsg?.text ?? ''); showToast('Copied'); } catch {}
+                  setActionMsg(null);
+                }}
+              />
+            )}
+            {actionMsg?.senderId === 'me' && (
+              <SheetItem
+                icon="trash-outline"
+                label="Delete for everyone"
+                danger
+                onPress={() => { if (actionMsg) deleteMessage(actionMsg.id, true); setActionMsg(null); }}
+              />
+            )}
+            <SheetItem
+              icon="trash-bin-outline"
+              label="Delete for me"
+              danger
+              onPress={() => { if (actionMsg) deleteMessage(actionMsg.id, false); setActionMsg(null); }}
+            />
+          </Animated.View>
+        </Pressable>
+      </Modal>
+
+      {/* Forward picker */}
+      <Modal visible={!!forwardMsg} transparent animationType="fade" onRequestClose={() => setForwardMsg(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => setForwardMsg(null)}>
+          <Animated.View entering={FadeInUp.duration(200).springify()} style={[styles.sheet, { maxHeight: 420 }]}>
+            <Text style={styles.sheetTitle}>Forward to…</Text>
+            <FlatList
+              data={allChats.filter((c) => c.id !== chatId && !c.id.startsWith('official-'))}
+              keyExtractor={(c) => c.id}
+              renderItem={({ item }) => {
+                const target = item.kind === 'group' || item.kind === 'channel'
+                  ? { name: item.name ?? 'Group', initials: item.iconEmoji ?? '👥', gradient: gradients.avatar2 }
+                  : (() => {
+                      const c = contacts.find((x) => x.id === item.contactId);
+                      return { name: c?.name ?? 'Chat', initials: c?.initials ?? '?', gradient: c?.gradient ?? gradients.avatar1 };
+                    })();
+                return (
+                  <PressableScale
+                    haptic={false}
+                    style={styles.forwardRow}
+                    onPress={() => {
+                      if (forwardMsg) forwardMessage(forwardMsg.id, item.id);
+                      setForwardMsg(null);
+                      showToast(`Forwarded to ${target.name} ✓`);
+                    }}
+                  >
+                    <Avatar gradient={target.gradient} label={target.initials} size={42} />
+                    <Text style={styles.forwardName}>{target.name}</Text>
+                  </PressableScale>
+                );
+              }}
+            />
+          </Animated.View>
+        </Pressable>
+      </Modal>
+
       {toast ? (
         <Animated.View entering={FadeInUp.springify()} style={styles.toast}>
           <Ionicons name="shield-checkmark" size={16} color={colors.yellow} />
@@ -440,6 +590,15 @@ export default function ChatScreen({ navigation, route }: any) {
         </Animated.View>
       ) : null}
     </KeyboardAvoidingView>
+  );
+}
+
+function SheetItem({ icon, label, onPress, danger }: { icon: any; label: string; onPress: () => void; danger?: boolean }) {
+  return (
+    <PressableScale haptic={false} style={styles.sheetItem} onPress={onPress}>
+      <Ionicons name={icon} size={19} color={danger ? colors.red : colors.textSecondary} />
+      <Text style={[styles.sheetItemText, danger && { color: colors.red }]}>{label}</Text>
+    </PressableScale>
   );
 }
 
@@ -535,4 +694,49 @@ const styles = StyleSheet.create({
   recHint: { color: colors.textTertiary, fontSize: 12, fontFamily: fonts.regular, marginLeft: 'auto' },
   recCancel: { color: colors.textSecondary, fontSize: 13.5, fontFamily: fonts.semiBold },
   recSend: { color: colors.yellow, fontSize: 13.5, fontFamily: fonts.semiBold },
+  // parity wave 1
+  bubbleDeleted: { backgroundColor: 'rgba(255,255,255,0.03)' },
+  deletedText: { color: colors.textTertiary, fontSize: 14, fontFamily: fonts.regular, fontStyle: 'italic' },
+  forwardTag: { color: 'rgba(255,255,255,0.6)', fontSize: 11.5, fontFamily: fonts.medium, fontStyle: 'italic', marginBottom: 3 },
+  quoteBlock: {
+    borderLeftWidth: 3, borderLeftColor: colors.yellow,
+    backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 8,
+    paddingHorizontal: 9, paddingVertical: 6, marginBottom: 6,
+  },
+  quoteName: { color: colors.yellow, fontSize: 12, fontFamily: fonts.semiBold },
+  quoteText: { color: 'rgba(255,255,255,0.75)', fontSize: 12.5, fontFamily: fonts.regular, marginTop: 1 },
+  reactionRow: { flexDirection: 'row', gap: 5, paddingHorizontal: 6, marginTop: -4, marginBottom: 5 },
+  reactionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 3,
+    backgroundColor: colors.surfaceRaised, borderWidth: 1, borderColor: colors.glassBorder,
+    borderRadius: 12, paddingHorizontal: 7, paddingVertical: 3,
+  },
+  reactionChipMine: { borderColor: 'rgba(246,184,0,0.5)' },
+  reactionEmoji: { fontSize: 13 },
+  reactionCount: { color: colors.textSecondary, fontSize: 11, fontFamily: fonts.semiBold },
+  replyBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    marginHorizontal: 12, marginBottom: 6, padding: 10,
+    backgroundColor: colors.surfaceRaised, borderRadius: 14,
+    borderWidth: 1, borderColor: colors.glassBorder,
+  },
+  replyBarLine: { width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: colors.yellow },
+  replyClose: { padding: 4 },
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  sheet: {
+    backgroundColor: colors.surfaceRaised, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: 14, paddingTop: 14, paddingBottom: 30,
+    borderWidth: 1, borderColor: colors.glassBorder,
+  },
+  sheetTitle: { color: colors.white, fontSize: 16, fontFamily: fonts.display, marginBottom: 10, marginLeft: 6 },
+  reactPickRow: {
+    flexDirection: 'row', justifyContent: 'space-around',
+    paddingVertical: 8, marginBottom: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border,
+  },
+  reactPick: { padding: 6, borderRadius: 20 },
+  sheetItem: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13, paddingHorizontal: 10 },
+  sheetItemText: { color: colors.white, fontSize: 15, fontFamily: fonts.medium },
+  forwardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 6 },
+  forwardName: { color: colors.white, fontSize: 15, fontFamily: fonts.medium },
 });

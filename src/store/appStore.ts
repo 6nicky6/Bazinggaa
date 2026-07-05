@@ -52,8 +52,18 @@ function mergeMessages(incoming: Message[], current: Message[]): Message[] {
   for (const m of current) byId.set(m.id, m);
   for (const m of incoming) {
     const existing = byId.get(m.id);
-    // don't let a re-fetch downgrade a locally-read/optimistic message
-    if (!existing) byId.set(m.id, m);
+    if (!existing) {
+      byId.set(m.id, m);
+    } else if (existing.status !== 'sending' && existing.status !== 'failed') {
+      // adopt server-side parity changes (others' reactions, remote deletes)
+      // without downgrading local read state
+      if (
+        JSON.stringify(m.reactions ?? null) !== JSON.stringify(existing.reactions ?? null) ||
+        !!m.deleted !== !!existing.deleted
+      ) {
+        byId.set(m.id, { ...existing, reactions: m.reactions, deleted: m.deleted, text: m.deleted ? '' : existing.text });
+      }
+    }
   }
   // keep local optimistic 'sending'/'failed' messages the server hasn't echoed
   for (const m of current) {
@@ -85,8 +95,11 @@ type State = {
   signIn: (phone: string) => void;
   completeProfile: (p: Partial<Profile>) => void;
   signOut: () => void;
-  sendMessage: (chatId: string, text: string) => void;
+  sendMessage: (chatId: string, text: string, extras?: { replyToId?: string; forwarded?: boolean }) => void;
   retryMessage: (messageId: string) => void;
+  reactToMessage: (messageId: string, emoji: string) => void;
+  deleteMessage: (messageId: string, forEveryone: boolean) => void;
+  forwardMessage: (messageId: string, toChatId: string) => void;
   sendImage: (chatId: string, imageUri: string) => void;
   activeCall: CallState | null;
   startCall: (contactId: string, video: boolean) => void;
@@ -223,11 +236,13 @@ export const useAppStore = create<State>()(
         }
       },
 
-      sendMessage: (chatId, text) => {
+      sendMessage: (chatId, text, extras) => {
         const tempId = uid();
         const msg: Message = {
           id: tempId, chatId, senderId: 'me', text,
           sentAt: Date.now(), status: isLive ? 'sending' : 'sent',
+          replyToId: extras?.replyToId,
+          forwarded: extras?.forwarded,
         };
         set((st) => ({ messages: [...st.messages, msg] }));
         if (chatId === BOT_ID) {
@@ -252,7 +267,7 @@ export const useAppStore = create<State>()(
           return;
         }
         if (isLive) {
-          live.sendMessageLive(chatId, text).then((serverMsg) => {
+          live.sendMessageLive(chatId, text, extras).then((serverMsg) => {
             set((st) => ({
               messages: st.messages.map((m) =>
                 m.id === tempId
@@ -298,7 +313,7 @@ export const useAppStore = create<State>()(
             m.id === messageId ? { ...m, status: 'sending' as const, sentAt: Date.now() } : m
           ),
         }));
-        live.sendMessageLive(msg.chatId, msg.text).then((serverMsg) => {
+        live.sendMessageLive(msg.chatId, msg.text, { replyToId: msg.replyToId, forwarded: msg.forwarded }).then((serverMsg) => {
           set((st) => ({
             messages: st.messages.map((m) =>
               m.id === messageId
@@ -307,6 +322,50 @@ export const useAppStore = create<State>()(
             ),
           }));
         });
+      },
+
+      reactToMessage: (messageId, emoji) => {
+        const msg = get().messages.find((m) => m.id === messageId);
+        if (!msg || msg.deleted) return;
+        const r = { ...(msg.reactions ?? {}) };
+        const cur = new Set(r[emoji] ?? []);
+        const adding = !cur.has('me');
+        if (adding) cur.add('me'); else cur.delete('me');
+        if (cur.size) r[emoji] = [...cur]; else delete r[emoji];
+        set((st) => ({
+          messages: st.messages.map((m) =>
+            m.id === messageId ? { ...m, reactions: Object.keys(r).length ? r : undefined } : m
+          ),
+        }));
+        if (isLive && msg.chatId !== BOT_ID && !msg.chatId.startsWith('official-')) {
+          live.reactLive(messageId, emoji, adding);
+        }
+      },
+
+      deleteMessage: (messageId, forEveryone) => {
+        const msg = get().messages.find((m) => m.id === messageId);
+        if (!msg) return;
+        if (forEveryone && msg.senderId === 'me') {
+          set((st) => ({
+            messages: st.messages.map((m) =>
+              m.id === messageId
+                ? { ...m, deleted: true, text: '', imageUri: undefined, reactions: undefined }
+                : m
+            ),
+          }));
+          if (isLive && msg.chatId !== BOT_ID && !msg.chatId.startsWith('official-')) {
+            live.deleteMessageLive(messageId);
+          }
+        } else {
+          // delete for me: local removal only
+          set((st) => ({ messages: st.messages.filter((m) => m.id !== messageId) }));
+        }
+      },
+
+      forwardMessage: (messageId, toChatId) => {
+        const msg = get().messages.find((m) => m.id === messageId);
+        if (!msg || msg.deleted) return;
+        get().sendMessage(toChatId, msg.text, { forwarded: true });
       },
 
       markChatRead: (chatId) =>
@@ -662,6 +721,12 @@ export const useAppStore = create<State>()(
     }
   )
 );
+
+// dev-only: expose the store for automated QA drivers (stripped from
+// production bundles — __DEV__ is false there)
+if (__DEV__) {
+  (globalThis as any).__bazStore = useAppStore;
+}
 
 // Helpers
 export const contactFor = (chatId: string) => {

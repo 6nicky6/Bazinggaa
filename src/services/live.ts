@@ -221,7 +221,46 @@ function toMessage(m: any, uid: string): Message {
     text: m.content,
     sentAt: new Date(m.sent_at).getTime(),
     status: m.read_at ? 'read' : m.delivered_at ? 'delivered' : 'sent',
+    // parity columns (exist after schema v3; harmless before)
+    replyToId: m.reply_to ?? undefined,
+    reactions: m.reactions && Object.keys(m.reactions).length ? remapReactions(m.reactions, uid) : undefined,
+    deleted: m.deleted || undefined,
+    forwarded: m.forwarded || undefined,
   };
+}
+
+// server reactions store uids; the app uses 'me' for the current user
+function remapReactions(r: Record<string, string[]>, uid: string): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [emoji, ids] of Object.entries(r)) {
+    out[emoji] = ids.map((i) => (i === uid ? 'me' : i));
+  }
+  return out;
+}
+
+// ---------- message parity ops (schema-tolerant: no-op before v3) ----------
+export async function reactLive(messageId: string, emoji: string, add: boolean) {
+  if (!supabase) return;
+  const uid = await myUserId();
+  if (!uid) return;
+  try {
+    const { data } = await supabase.from('messages').select('reactions').eq('id', messageId).maybeSingle();
+    const r: Record<string, string[]> = (data as any)?.reactions ?? {};
+    const cur = new Set(r[emoji] ?? []);
+    if (add) cur.add(uid); else cur.delete(uid);
+    if (cur.size) r[emoji] = [...cur]; else delete r[emoji];
+    const { error } = await supabase.from('messages').update({ reactions: r }).eq('id', messageId);
+    if (error) console.warn('[live] react:', error.message);
+  } catch {}
+}
+
+export async function deleteMessageLive(messageId: string) {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('messages')
+    .update({ deleted: true, content: '' })
+    .eq('id', messageId);
+  if (error) console.warn('[live] delete:', error.message);
 }
 
 // ---------- chat ops ----------
@@ -273,15 +312,23 @@ export async function ensureDirectChat(otherUserId: string): Promise<string | nu
   return data as string;
 }
 
-export async function sendMessageLive(chatId: string, text: string): Promise<Message | null> {
+export async function sendMessageLive(
+  chatId: string,
+  text: string,
+  extras?: { replyToId?: string; forwarded?: boolean }
+): Promise<Message | null> {
   if (!supabase) return null;
   const uid = await myUserId();
   if (!uid) return null;
-  const { data, error } = await supabase
-    .from('messages')
-    .insert({ chat_id: chatId, sender_id: uid, content: text })
-    .select()
-    .single();
+  const base: any = { chat_id: chatId, sender_id: uid, content: text };
+  const rich: any = { ...base };
+  if (extras?.replyToId) rich.reply_to = extras.replyToId;
+  if (extras?.forwarded) rich.forwarded = true;
+  let { data, error } = await supabase.from('messages').insert(rich).select().single();
+  if (error && Object.keys(rich).length > Object.keys(base).length) {
+    // pre-v3 schema: parity columns missing — send plain rather than fail
+    ({ data, error } = await supabase.from('messages').insert(base).select().single());
+  }
   if (error) {
     console.warn('[live] sendMessage:', error.message);
     return null;
