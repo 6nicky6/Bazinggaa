@@ -3,6 +3,8 @@ import {
   FlatList, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
+import VoiceBubble from '../components/VoiceBubble';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -107,6 +109,46 @@ export default function ChatScreen({ navigation, route }: any) {
   const [recSecs, setRecSecs] = useState(0);
   const recLockedRef = React.useRef(false);
 
+  // REAL recording via expo-audio
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recStartAt = React.useRef(0);
+
+  const beginRecording = async () => {
+    try {
+      const perm = await AudioModule.requestRecordingPermissionsAsync();
+      if (!perm.granted) {
+        showToast('Microphone permission needed for voice notes 🎙️');
+        setRecording(false);
+        return;
+      }
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      recStartAt.current = Date.now();
+    } catch (e) {
+      console.warn('[voice] record start failed:', e);
+      setRecording(false);
+      showToast('Could not start recording');
+    }
+  };
+
+  const finishRecording = async (send: boolean) => {
+    try {
+      await recorder.stop();
+      await setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      const uri = recorder.uri;
+      const secs = Math.round((Date.now() - recStartAt.current) / 1000);
+      if (send && uri && secs >= 1) {
+        sendVoice(chatId, uri, secs);
+      } else if (send) {
+        showToast('Too short — hold to record 🎙️');
+      }
+    } catch (e) {
+      console.warn('[voice] record stop failed:', e);
+      if (send) showToast('Recording failed — try again');
+    }
+  };
+
   // WhatsApp-style mic: hold = record, slide up = lock (keep recording hands-free)
   const micPan = React.useMemo(
     () =>
@@ -117,6 +159,7 @@ export default function ChatScreen({ navigation, route }: any) {
           setRecLocked(false);
           setRecSecs(0);
           setRecording(true);
+          beginRecording();
         },
         onPanResponderMove: (_e, g) => {
           if (g.dy < -45 && !recLockedRef.current) {
@@ -127,24 +170,28 @@ export default function ChatScreen({ navigation, route }: any) {
         onPanResponderRelease: () => {
           if (!recLockedRef.current) {
             setRecording(false);
-            showToast('Voice messages arrive in the next update ⚡');
+            finishRecording(true); // release = send (WhatsApp behavior)
           }
           // locked: keep recording until Cancel/Send tapped
         },
         onPanResponderTerminate: () => {
-          if (!recLockedRef.current) setRecording(false);
+          if (!recLockedRef.current) {
+            setRecording(false);
+            finishRecording(false);
+          }
         },
       }),
-    [draft]
+    [draft, chatId]
   );
 
   const stopRecording = (send: boolean) => {
     setRecording(false);
     setRecLocked(false);
     recLockedRef.current = false;
-    if (send) showToast('Voice messages arrive in the next update ⚡');
+    finishRecording(send);
   };
   const sendImage = useAppStore((s) => s.sendImage);
+  const sendVoice = useAppStore((s) => s.sendVoice);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -296,6 +343,12 @@ export default function ChatScreen({ navigation, route }: any) {
               )}
               {m.deleted ? (
                 <Text style={styles.deletedText}>🚫 This message was deleted</Text>
+              ) : m.audioUrl || m.audioUri ? (
+                <VoiceBubble
+                  uri={(m.audioUrl ?? m.audioUri) as string}
+                  durationSec={m.audioDurationSec}
+                  light={mine}
+                />
               ) : m.imageUrl || m.imageUri ? (
                 <>
                   <Image source={{ uri: m.imageUrl ?? m.imageUri }} style={styles.msgImage} resizeMode="cover" />

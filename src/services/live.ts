@@ -224,6 +224,8 @@ function toMessage(m: any, uid: string): Message {
     status: m.read_at ? 'read' : m.delivered_at ? 'delivered' : 'sent',
     // parity columns (exist after schema v3; harmless before)
     imageUrl: m.image_url ?? undefined,
+    audioUrl: m.audio_url ?? undefined,
+    audioDurationSec: m.audio_duration ?? undefined,
     replyToId: m.reply_to ?? undefined,
     reactions: m.reactions && Object.keys(m.reactions).length ? remapReactions(m.reactions, uid) : undefined,
     deleted: m.deleted || undefined,
@@ -314,33 +316,37 @@ export async function ensureDirectChat(otherUserId: string): Promise<string | nu
   return data as string;
 }
 
-// Upload a local image to Supabase Storage; returns the public URL or null.
+// Upload local media to Supabase Storage; returns the public URL or null.
 // (Bucket + policies land with schema v3 — until then this fails gracefully.)
-export async function uploadImage(chatId: string, localUri: string): Promise<string | null> {
+export async function uploadMedia(
+  chatId: string,
+  localUri: string,
+  kind: 'image' | 'audio'
+): Promise<string | null> {
   if (!supabase) return null;
   try {
     const resp = await fetch(localUri);
     const buf = await resp.arrayBuffer();
-    const ext = localUri.includes('.png') ? 'png' : 'jpg';
+    const ext = kind === 'audio' ? 'm4a' : localUri.includes('.png') ? 'png' : 'jpg';
+    const type = kind === 'audio' ? 'audio/m4a' : ext === 'png' ? 'image/png' : 'image/jpeg';
     const path = `${chatId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-    const { error } = await supabase.storage
-      .from('media')
-      .upload(path, buf, { contentType: ext === 'png' ? 'image/png' : 'image/jpeg' });
+    const { error } = await supabase.storage.from('media').upload(path, buf, { contentType: type });
     if (error) {
-      console.warn('[live] image upload:', error.message);
+      console.warn('[live] media upload:', error.message);
       return null;
     }
     return supabase.storage.from('media').getPublicUrl(path).data.publicUrl;
   } catch (e: any) {
-    console.warn('[live] image upload failed:', e?.message ?? e);
+    console.warn('[live] media upload failed:', e?.message ?? e);
     return null;
   }
 }
+export const uploadImage = (chatId: string, uri: string) => uploadMedia(chatId, uri, 'image');
 
 export async function sendMessageLive(
   chatId: string,
   text: string,
-  extras?: { replyToId?: string; forwarded?: boolean; imageUrl?: string }
+  extras?: { replyToId?: string; forwarded?: boolean; imageUrl?: string; audioUrl?: string; audioDurationSec?: number }
 ): Promise<Message | null> {
   if (!supabase) return null;
   const uid = await myUserId();
@@ -350,6 +356,7 @@ export async function sendMessageLive(
   if (extras?.replyToId) rich.reply_to = extras.replyToId;
   if (extras?.forwarded) rich.forwarded = true;
   if (extras?.imageUrl) rich.image_url = extras.imageUrl;
+  if (extras?.audioUrl) { rich.audio_url = extras.audioUrl; rich.audio_duration = extras.audioDurationSec ?? 0; }
   let { data, error } = await supabase.from('messages').insert(rich).select().single();
   if (error && Object.keys(rich).length > Object.keys(base).length) {
     // pre-v3 schema: parity columns missing — send plain rather than fail

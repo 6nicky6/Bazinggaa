@@ -115,6 +115,7 @@ type State = {
   deleteMessage: (messageId: string, forEveryone: boolean) => void;
   forwardMessage: (messageId: string, toChatId: string) => void;
   sendImage: (chatId: string, imageUri: string) => void;
+  sendVoice: (chatId: string, audioUri: string, durationSec: number) => void;
   activeCall: CallState | null;
   startCall: (contactId: string, video: boolean) => void;
   answerCall: (accept: boolean) => void;
@@ -340,6 +341,50 @@ export const useAppStore = create<State>()(
                 m.id === tempId
                   ? serverMsg
                     ? { ...serverMsg, imageUri, text: '' }
+                    : { ...m, status: 'failed' as const }
+                  : m
+              ),
+            }));
+          });
+        }
+      },
+
+      sendVoice: (chatId, audioUri, durationSec) => {
+        const tempId = uid();
+        const isRealChat = isLive && chatId !== BOT_ID && !chatId.startsWith('official-');
+        set((st) => ({
+          messages: [...st.messages, {
+            id: tempId, chatId, senderId: 'me', text: '', audioUri,
+            audioDurationSec: durationSec,
+            sentAt: Date.now(), status: isRealChat ? ('sending' as const) : ('sent' as const),
+          }],
+        }));
+        if (chatId === BOT_ID) {
+          setTimeout(() => set((st) => ({
+            messages: [...st.messages, {
+              id: uid(), chatId, senderId: BOT_ID,
+              text: "Got your voice note! 🎙️ I can't listen yet — my ears arrive with a future update. Type it for me?",
+              sentAt: Date.now(), status: 'read' as const,
+            }],
+          })), 1200);
+        } else if (!isLive) {
+          scheduleAutoReply(chatId, 'sent you a voice note 🎙️');
+        } else if (isRealChat) {
+          live.uploadMedia(chatId, audioUri, 'audio').then(async (url) => {
+            if (!url) {
+              set((st) => ({
+                messages: st.messages.map((m) => (m.id === tempId ? { ...m, status: 'failed' as const } : m)),
+              }));
+              return;
+            }
+            const serverMsg = await live.sendMessageLive(chatId, '🎙️ Voice message', {
+              audioUrl: url, audioDurationSec: durationSec,
+            });
+            set((st) => ({
+              messages: st.messages.map((m) =>
+                m.id === tempId
+                  ? serverMsg
+                    ? { ...serverMsg, audioUri, text: '' }
                     : { ...m, status: 'failed' as const }
                   : m
               ),

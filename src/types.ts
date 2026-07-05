@@ -10,6 +10,9 @@ export type Message = {
   text: string;
   imageUri?: string; // local uri (sender's device)
   imageUrl?: string; // remote uri (synced via Supabase Storage — arrives on both sides)
+  audioUri?: string; // local voice note
+  audioUrl?: string; // synced voice note
+  audioDurationSec?: number;
   sentAt: number;
   status: MessageStatus;
   replyToId?: string; // quoted message id
