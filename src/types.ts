@@ -44,6 +44,7 @@ export type Chat = {
   myRole?: 'owner' | 'admin' | 'member';
   pinned?: boolean;
   muted?: boolean;
+  wallpaper?: number; // index into avatarGradients for a subtle chat backdrop
 };
 
 export type CallState = {

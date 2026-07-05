@@ -117,6 +117,7 @@ type State = {
   forwardMessage: (messageId: string, toChatId: string) => void;
   toggleStar: (messageId: string) => void;
   toggleMute: (chatId: string) => void;
+  setWallpaper: (chatId: string, wallpaper: number | undefined) => void;
   sendImage: (chatId: string, imageUri: string) => void;
   sendVoice: (chatId: string, audioUri: string, durationSec: number) => void;
   activeCall: CallState | null;
@@ -475,6 +476,11 @@ export const useAppStore = create<State>()(
       toggleMute: (chatId) =>
         set((st) => ({
           chats: st.chats.map((c) => (c.id === chatId ? { ...c, muted: !c.muted } : c)),
+        })),
+
+      setWallpaper: (chatId, wallpaper) =>
+        set((st) => ({
+          chats: st.chats.map((c) => (c.id === chatId ? { ...c, wallpaper } : c)),
         })),
 
       markChatRead: (chatId) => {

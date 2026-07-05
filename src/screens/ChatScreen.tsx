@@ -14,7 +14,7 @@ import GlowBackground from '../components/GlowBackground';
 import AttachSheet from '../components/AttachSheet';
 import PressableScale from '../components/PressableScale';
 import Avatar from '../components/Avatar';
-import { colors, gradients } from '../theme/colors';
+import { avatarGradients, colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
 import { smartReplies } from '../services/ai';
@@ -74,6 +74,7 @@ export default function ChatScreen({ navigation, route }: any) {
   const forwardMessage = useAppStore((s) => s.forwardMessage);
   const toggleStar = useAppStore((s) => s.toggleStar);
   const toggleMute = useAppStore((s) => s.toggleMute);
+  const setWallpaper = useAppStore((s) => s.setWallpaper);
   const allChats = useAppStore((s) => s.chats);
   const startCall = useAppStore((s) => s.startCall);
   const block = useAppStore((s) => s.block);
@@ -259,6 +260,15 @@ export default function ChatScreen({ navigation, route }: any) {
       keyboardVerticalOffset={0}
     >
       <GlowBackground />
+      {chat?.wallpaper !== undefined && (
+        <LinearGradient
+          colors={avatarGradients[chat.wallpaper % avatarGradients.length]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill as any, { opacity: 0.09 }]}
+          pointerEvents="none"
+        />
+      )}
 
       {/* Header */}
       <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
@@ -558,6 +568,25 @@ export default function ChatScreen({ navigation, route }: any) {
               />
               <Text style={styles.menuText}>{chat?.muted ? 'Unmute' : 'Mute'}</Text>
             </PressableScale>
+            <View style={styles.wallpaperRow}>
+              <Ionicons name="color-palette-outline" size={18} color={colors.textSecondary} />
+              <Text style={styles.menuText}>Wallpaper</Text>
+              <View style={{ flexDirection: 'row', gap: 6, marginLeft: 'auto' }}>
+                {avatarGradients.slice(0, 5).map((g, i) => (
+                  <PressableScale
+                    key={i}
+                    haptic={false}
+                    scaleTo={0.8}
+                    onPress={() => { setWallpaper(chatId, chat?.wallpaper === i ? undefined : i); setMenuOpen(false); }}
+                  >
+                    <LinearGradient
+                      colors={g}
+                      style={[styles.wallSwatch, chat?.wallpaper === i && styles.wallSwatchActive]}
+                    />
+                  </PressableScale>
+                ))}
+              </View>
+            </View>
             <PressableScale
               haptic={false}
               style={styles.menuItem}
@@ -832,4 +861,7 @@ const styles = StyleSheet.create({
   sheetItemText: { color: colors.white, fontSize: 15, fontFamily: fonts.medium },
   forwardRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 9, paddingHorizontal: 6 },
   forwardName: { color: colors.white, fontSize: 15, fontFamily: fonts.medium },
+  wallpaperRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+  wallSwatch: { width: 22, height: 22, borderRadius: 11 },
+  wallSwatchActive: { borderWidth: 2, borderColor: colors.white },
 });
