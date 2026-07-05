@@ -11,6 +11,31 @@ import {
 import { backendMode } from '../services/supabase';
 import * as live from '../services/live';
 import { BOT_CONTACT, BOT_ID, botReply } from '../services/bot';
+import { notifyMessage } from '../services/notifications';
+import { AppState } from 'react-native';
+
+// app foreground/background tracking (native; web stays 'active')
+let appActive = true;
+try {
+  AppState.addEventListener('change', (s) => {
+    appActive = s === 'active';
+  });
+} catch {}
+
+// fire a local notification for messages that arrive while backgrounded —
+// honoring the in-app Notifications toggle and the blocked list
+function alertIncoming(
+  newMsgs: Message[],
+  contacts: Contact[],
+  opts: { enabled: boolean; blocked: string[] }
+) {
+  if (appActive || !opts.enabled) return;
+  for (const m of newMsgs.slice(-3)) {
+    if (m.senderId === 'me' || opts.blocked.includes(m.senderId)) continue;
+    const from = contacts.find((c) => c.id === m.senderId);
+    notifyMessage(from?.name ?? 'New message', m.text.slice(0, 120));
+  }
+}
 
 const isLive = backendMode === 'live';
 
@@ -232,6 +257,10 @@ export const useAppStore = create<State>()(
                   : m
               ),
             }));
+            // Remote push fan-out intentionally NOT done client-side: it would
+            // require exposing recipients' push tokens to every user (spoofing
+            // risk, caught in security review). Ships as a Supabase Edge
+            // Function triggered by message inserts once the dashboard is back.
           });
         } else {
           scheduleAutoReply(chatId, text);
@@ -358,6 +387,13 @@ export const useAppStore = create<State>()(
         liveUnsub?.();
         liveUnsub = live.subscribeLive({
           onMessage: (m) => {
+            const st0 = get();
+            if (!st0.messages.some((x) => x.id === m.id)) {
+              alertIncoming([m], st0.contacts, {
+                enabled: st0.settings.notifications,
+                blocked: st0.blocked,
+              });
+            }
             set((st) =>
               st.messages.some((x) => x.id === m.id)
                 ? st // already have it (own optimistic replaced by server copy)
@@ -426,6 +462,11 @@ export const useAppStore = create<State>()(
               merged.length !== s2.messages.length ||
               d.chats.length !== s2.chats.filter((c) => c.id !== BOT_ID).length;
             if (!changed) return {} as any;
+            const known = new Set(s2.messages.map((m) => m.id));
+            alertIncoming(merged.filter((m) => !known.has(m.id)), [BOT_CONTACT, ...d.contacts], {
+              enabled: s2.settings.notifications,
+              blocked: d.blocked, // freshest block list from the server
+            });
             return {
               contacts: [BOT_CONTACT, ...d.contacts],
               chats: [...s2.chats.filter((c) => c.id === BOT_ID), ...d.chats],

@@ -101,7 +101,14 @@ export default function RootNavigator() {
 
   // live mode: load real data + subscribe to realtime once signed in
   React.useEffect(() => {
-    if (authed && hasProfile) bootLive();
+    if (authed && hasProfile) {
+      bootLive();
+      // notifications: ask permission + register this device for push
+      import('../services/notifications').then(async (n) => {
+        await n.initNotifications();
+        n.registerPushToken();
+      });
+    }
   }, [authed, hasProfile]);
 
   return (

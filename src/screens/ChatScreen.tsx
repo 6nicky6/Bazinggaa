@@ -188,7 +188,7 @@ export default function ChatScreen({ navigation, route }: any) {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior="padding"
       keyboardVerticalOffset={0}
     >
       <GlowBackground />

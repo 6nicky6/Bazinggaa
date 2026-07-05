@@ -75,5 +75,17 @@ create policy "calls update by participants" on public.calls
   for update to authenticated using (caller_id = auth.uid() or callee_id = auth.uid());
 alter publication supabase_realtime add table public.calls;
 
--- 4) USERNAME SEARCH (discovery redesign: find by handle, not list-everyone)
+-- 4) PUSH NOTIFICATIONS: owner-only device tokens (NOT on profiles — other
+-- users must never read someone's push token; sending happens server-side)
+create table if not exists public.devices (
+  user_id uuid references public.profiles on delete cascade primary key,
+  push_token text not null,
+  updated_at timestamptz default now()
+);
+alter table public.devices enable row level security;
+create policy "devices owner only" on public.devices
+  for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- 5) USERNAME SEARCH (discovery redesign: find by handle, not list-everyone)
 create index if not exists idx_profiles_username on public.profiles (username);
