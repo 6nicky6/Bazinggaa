@@ -168,7 +168,7 @@ if isinstance(r, list):
 # 7. moment view tracking
 s, r = req(f"{SB}/rest/v1/moments?author_id=eq.{A['uid']}&select=id&limit=1", headers=H(B))
 if isinstance(r, list) and r:
-    s2, _ = req(f"{SB}/rest/v1/moment_views", "POST", {"moment_id": r[0]["id"], "viewer_id": B["uid"]}, {**H(B), "Prefer": "resolution=merge-duplicates"})
+    s2, _ = req(f"{SB}/rest/v1/moment_views?on_conflict=moment_id,viewer_id", "POST", {"moment_id": r[0]["id"], "viewer_id": B["uid"]}, {**H(B), "Prefer": "resolution=ignore-duplicates"})
     log(f"7. B view-tracks A's moment: {s2} {'PASS ✅' if s2 in (200,201) else 'FAIL ❌'}")
 
 # 8. block / unblock cycle

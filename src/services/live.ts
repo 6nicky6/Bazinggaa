@@ -414,7 +414,11 @@ export async function viewMomentLive(momentId: string) {
   if (!supabase) return;
   const uid = await myUserId();
   if (!uid) return;
-  await supabase.from('moment_views').upsert({ moment_id: momentId, viewer_id: uid });
+  // ignoreDuplicates -> ON CONFLICT DO NOTHING; RLS allows insert but not update,
+  // so a plain upsert 403s when the view row already exists (re-viewing a moment)
+  await supabase
+    .from('moment_views')
+    .upsert({ moment_id: momentId, viewer_id: uid }, { ignoreDuplicates: true });
 }
 
 export async function deleteMomentLive(momentId: string) {
