@@ -72,6 +72,8 @@ export default function ChatScreen({ navigation, route }: any) {
   const reactToMessage = useAppStore((s) => s.reactToMessage);
   const deleteMessage = useAppStore((s) => s.deleteMessage);
   const forwardMessage = useAppStore((s) => s.forwardMessage);
+  const toggleStar = useAppStore((s) => s.toggleStar);
+  const toggleMute = useAppStore((s) => s.toggleMute);
   const allChats = useAppStore((s) => s.chats);
   const startCall = useAppStore((s) => s.startCall);
   const block = useAppStore((s) => s.block);
@@ -360,6 +362,7 @@ export default function ChatScreen({ navigation, route }: any) {
                 <Text style={styles.msgText}>{m.text}</Text>
               )}
               <View style={styles.metaRow}>
+                {m.starred && <Ionicons name="star" size={11} color={colors.yellow} />}
                 {mine && m.status === 'failed' && (
                   <Text style={[styles.metaText, { color: colors.yellow }]}>Not sent · tap to retry</Text>
                 )}
@@ -543,6 +546,22 @@ export default function ChatScreen({ navigation, route }: any) {
               haptic={false}
               style={styles.menuItem}
               onPress={() => {
+                toggleMute(chatId);
+                setMenuOpen(false);
+                showToast(chat?.muted ? 'Chat unmuted 🔔' : 'Chat muted 🔕');
+              }}
+            >
+              <Ionicons
+                name={chat?.muted ? 'notifications-outline' : 'notifications-off-outline'}
+                size={18}
+                color={colors.textSecondary}
+              />
+              <Text style={styles.menuText}>{chat?.muted ? 'Unmute' : 'Mute'}</Text>
+            </PressableScale>
+            <PressableScale
+              haptic={false}
+              style={styles.menuItem}
+              onPress={() => {
                 block(contact.id);
                 setMenuOpen(false);
               }}
@@ -587,6 +606,11 @@ export default function ChatScreen({ navigation, route }: any) {
                 </PressableScale>
               ))}
             </View>
+            <SheetItem
+              icon={actionMsg?.starred ? 'star' : 'star-outline'}
+              label={actionMsg?.starred ? 'Unstar' : 'Star'}
+              onPress={() => { if (actionMsg) toggleStar(actionMsg.id); setActionMsg(null); }}
+            />
             <SheetItem icon="arrow-undo-outline" label="Reply" onPress={() => { setReplyTo(actionMsg); setActionMsg(null); }} />
             <SheetItem icon="arrow-redo-outline" label="Forward" onPress={() => { setForwardMsg(actionMsg); setActionMsg(null); }} />
             {!actionMsg?.imageUri && (

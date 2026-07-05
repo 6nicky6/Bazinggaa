@@ -28,11 +28,12 @@ try {
 function alertIncoming(
   newMsgs: Message[],
   contacts: Contact[],
-  opts: { enabled: boolean; blocked: string[] }
+  opts: { enabled: boolean; blocked: string[]; muted?: string[] }
 ) {
   if (appActive || !opts.enabled) return;
   for (const m of newMsgs.slice(-3)) {
     if (m.senderId === 'me' || opts.blocked.includes(m.senderId)) continue;
+    if (opts.muted?.includes(m.chatId)) continue; // muted chats stay silent
     const from = contacts.find((c) => c.id === m.senderId);
     notifyMessage(from?.name ?? 'New message', m.text.slice(0, 120));
   }
@@ -114,6 +115,8 @@ type State = {
   reactToMessage: (messageId: string, emoji: string) => void;
   deleteMessage: (messageId: string, forEveryone: boolean) => void;
   forwardMessage: (messageId: string, toChatId: string) => void;
+  toggleStar: (messageId: string) => void;
+  toggleMute: (chatId: string) => void;
   sendImage: (chatId: string, imageUri: string) => void;
   sendVoice: (chatId: string, audioUri: string, durationSec: number) => void;
   activeCall: CallState | null;
@@ -462,6 +465,18 @@ export const useAppStore = create<State>()(
         get().sendMessage(toChatId, msg.text, { forwarded: true });
       },
 
+      toggleStar: (messageId) =>
+        set((st) => ({
+          messages: st.messages.map((m) =>
+            m.id === messageId ? { ...m, starred: !m.starred } : m
+          ),
+        })),
+
+      toggleMute: (chatId) =>
+        set((st) => ({
+          chats: st.chats.map((c) => (c.id === chatId ? { ...c, muted: !c.muted } : c)),
+        })),
+
       markChatRead: (chatId) => {
         set((st) => ({ lastReadAt: { ...st.lastReadAt, [chatId]: Date.now() } }));
         // read receipts: tell the sender their message was seen (throttled)
@@ -605,6 +620,7 @@ export const useAppStore = create<State>()(
               alertIncoming([m], st0.contacts, {
                 enabled: st0.settings.notifications,
                 blocked: st0.blocked,
+                muted: st0.chats.filter((c) => c.muted).map((c) => c.id),
               });
             }
             set((st) =>
@@ -702,6 +718,7 @@ export const useAppStore = create<State>()(
             alertIncoming(merged.filter((m) => !known.has(m.id)), [BOT_CONTACT, ...d.contacts], {
               enabled: s2.settings.notifications,
               blocked: d.blocked, // freshest block list from the server
+              muted: s2.chats.filter((c) => c.muted).map((c) => c.id),
             });
             return {
               contacts: [BOT_CONTACT, ...d.contacts],

@@ -19,6 +19,7 @@ export type Message = {
   reactions?: Record<string, string[]>; // emoji -> reactor ids ('me' or uid)
   deleted?: boolean; // deleted for everyone
   forwarded?: boolean;
+  starred?: boolean; // local bookmark (WhatsApp-style star)
 };
 
 export type Contact = {
