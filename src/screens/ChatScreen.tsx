@@ -17,7 +17,7 @@ import Avatar from '../components/Avatar';
 import { avatarGradients, colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
-import { smartReplies } from '../services/ai';
+import { ChatMood, detectMood, smartReplies, summarizeChat, translateText } from '../services/ai';
 import { reportLive } from '../services/live';
 import { backendMode } from '../services/supabase';
 import { Message } from '../types';
@@ -109,6 +109,10 @@ export default function ChatScreen({ navigation, route }: any) {
   const [actionMsg, setActionMsg] = useState<Message | null>(null);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
   const [forwardMsg, setForwardMsg] = useState<Message | null>(null);
+  const [aiSummary, setAiSummary] = useState<string | null>(null);
+  const [summarizing, setSummarizing] = useState(false);
+  const [translations, setTranslations] = useState<Record<string, string>>({});
+  const [mood, setMood] = useState<ChatMood>('neutral');
   const [recording, setRecording] = useState(false);
   const [recLocked, setRecLocked] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
@@ -203,6 +207,49 @@ export default function ChatScreen({ navigation, route }: any) {
     setTimeout(() => setToast(''), 2600);
   };
 
+  // AI Mood Engine: subtle theme tint from conversation mood (only when the AI
+  // toggle is on, enough messages exist, and no manual wallpaper is set)
+  useEffect(() => {
+    if (!smartOn || chat?.wallpaper !== undefined) return;
+    const texts = messages.filter((m) => !m.deleted && m.text).map((m) => m.text);
+    if (texts.length < 6) return;
+    detectMood(chatId, texts).then(setMood);
+  }, [chatId, smartOn, messages.length > 6]);
+
+  const MOOD_TINTS: Record<ChatMood, readonly [string, string] | null> = {
+    happy: ['#F6B800', '#FB923C'],
+    calm: ['#0891B2', '#22D3EE'],
+    romantic: ['#DB2777', '#F472B6'],
+    serious: ['#334155', '#64748B'],
+    neutral: null,
+  };
+  const moodTint = chat?.wallpaper === undefined ? MOOD_TINTS[mood] : null;
+
+  const runSummarize = async () => {
+    setMenuOpen(false);
+    setSummarizing(true);
+    setAiSummary('');
+    const lines = messages
+      .filter((m) => m.chatId === chatId && !m.deleted && m.text)
+      .map((m) => ({
+        from: m.senderId === 'me' ? 'Me' : contacts.find((c) => c.id === m.senderId)?.name ?? 'Member',
+        text: m.text,
+      }));
+    const out = await summarizeChat(lines);
+    setSummarizing(false);
+    setAiSummary(out ?? 'Summary unavailable right now — try again in a moment.');
+  };
+
+  const runTranslate = async (m: Message) => {
+    setActionMsg(null);
+    const lang = (() => {
+      try { return Intl.DateTimeFormat().resolvedOptions().locale || 'English'; } catch { return 'English'; }
+    })();
+    const out = await translateText(m.text, lang);
+    if (out) setTranslations((t) => ({ ...t, [m.id]: out }));
+    else showToast('Translation unavailable right now');
+  };
+
   // voice hold-to-record UI (audio capture ships next update)
   useEffect(() => {
     if (!recording) return;
@@ -262,7 +309,7 @@ export default function ChatScreen({ navigation, route }: any) {
       keyboardVerticalOffset={0}
     >
       <GlowBackground />
-      {chat?.wallpaper !== undefined && (
+      {chat?.wallpaper !== undefined ? (
         <LinearGradient
           colors={avatarGradients[chat.wallpaper % avatarGradients.length]}
           start={{ x: 0, y: 0 }}
@@ -270,7 +317,16 @@ export default function ChatScreen({ navigation, route }: any) {
           style={[StyleSheet.absoluteFill as any, { opacity: 0.09 }]}
           pointerEvents="none"
         />
-      )}
+      ) : moodTint ? (
+        // AI Mood Engine: barely-there tint matching the conversation's vibe
+        <LinearGradient
+          colors={moodTint}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[StyleSheet.absoluteFill as any, { opacity: 0.06 }]}
+          pointerEvents="none"
+        />
+      ) : null}
 
       {/* Header */}
       <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
@@ -371,7 +427,12 @@ export default function ChatScreen({ navigation, route }: any) {
                   )}
                 </>
               ) : (
-                <Text style={styles.msgText}>{m.text}</Text>
+                <>
+                  <Text style={styles.msgText}>{m.text}</Text>
+                  {translations[m.id] && (
+                    <Text style={styles.translatedText}>🌐 {translations[m.id]}</Text>
+                  )}
+                </>
               )}
               <View style={styles.metaRow}>
                 {m.starred && <Ionicons name="star" size={11} color={colors.yellow} />}
@@ -570,6 +631,10 @@ export default function ChatScreen({ navigation, route }: any) {
               />
               <Text style={styles.menuText}>{chat?.muted ? 'Unmute' : 'Mute'}</Text>
             </PressableScale>
+            <PressableScale haptic={false} style={styles.menuItem} onPress={runSummarize}>
+              <Ionicons name="sparkles-outline" size={18} color={colors.yellow} />
+              <Text style={styles.menuText}>Summarize chat ✨</Text>
+            </PressableScale>
             {(['close', 'family'] as const).map((circle) => {
               const inCircle = circles[circle].includes(contact.id);
               return (
@@ -672,6 +737,13 @@ export default function ChatScreen({ navigation, route }: any) {
             />
             <SheetItem icon="arrow-undo-outline" label="Reply" onPress={() => { setReplyTo(actionMsg); setActionMsg(null); }} />
             <SheetItem icon="arrow-redo-outline" label="Forward" onPress={() => { setForwardMsg(actionMsg); setActionMsg(null); }} />
+            {!!actionMsg?.text && !actionMsg?.deleted && (
+              <SheetItem
+                icon="language-outline"
+                label="Translate"
+                onPress={() => actionMsg && runTranslate(actionMsg)}
+              />
+            )}
             {!actionMsg?.imageUri && (
               <SheetItem
                 icon="copy-outline"
@@ -731,6 +803,30 @@ export default function ChatScreen({ navigation, route }: any) {
                 );
               }}
             />
+          </Animated.View>
+        </Pressable>
+      </Modal>
+
+      {/* AI chat summary */}
+      <Modal visible={aiSummary !== null || summarizing} transparent animationType="fade" onRequestClose={() => setAiSummary(null)}>
+        <Pressable style={styles.sheetBackdrop} onPress={() => { if (!summarizing) setAiSummary(null); }}>
+          <Animated.View entering={FadeInUp.duration(200).springify()} style={[styles.sheet, { maxHeight: 440 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10, marginLeft: 6 }}>
+              <Ionicons name="sparkles" size={18} color={colors.yellow} />
+              <Text style={styles.sheetTitle}>{summarizing ? 'Summarizing…' : 'Chat summary'}</Text>
+            </View>
+            {summarizing ? (
+              <Text style={styles.summaryText}>BazinggaBot is reading the conversation… ⚡</Text>
+            ) : (
+              <FlatList
+                data={[aiSummary ?? '']}
+                keyExtractor={(_, i) => String(i)}
+                renderItem={({ item }) => <Text style={styles.summaryText}>{item}</Text>}
+              />
+            )}
+            <PressableScale haptic={false} style={styles.summaryClose} onPress={() => setAiSummary(null)}>
+              <Text style={{ color: colors.textSecondary, fontFamily: fonts.semiBold, fontSize: 14 }}>Close</Text>
+            </PressableScale>
           </Animated.View>
         </Pressable>
       </Modal>
@@ -894,4 +990,11 @@ const styles = StyleSheet.create({
   wallpaperRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
   wallSwatch: { width: 22, height: 22, borderRadius: 11 },
   wallSwatchActive: { borderWidth: 2, borderColor: colors.white },
+  translatedText: {
+    color: 'rgba(255,255,255,0.8)', fontSize: 13.5, fontFamily: fonts.regular,
+    fontStyle: 'italic', marginTop: 5, borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255,255,255,0.25)', paddingTop: 5,
+  },
+  summaryText: { color: colors.white, fontSize: 14.5, fontFamily: fonts.regular, lineHeight: 22, paddingHorizontal: 8 },
+  summaryClose: { alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 30, marginTop: 6 },
 });

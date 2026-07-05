@@ -78,3 +78,72 @@ export const smartReplies: SmartReplyProvider = GEMINI_KEY
   : new MockProvider();
 
 export const aiProviderName = GEMINI_KEY ? 'Gemini Flash (live)' : 'Demo mode (add Gemini key in .env)';
+
+// ---------- AI trio: summarize, translate, mood (silent-fail like everything) ----------
+async function gemini(prompt: string, maxTokens = 400): Promise<string | null> {
+  if (!GEMINI_KEY) return null;
+  try {
+    const res = await fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-goog-api-key': GEMINI_KEY as string },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            temperature: 0.4,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+      }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const text = (data?.candidates?.[0]?.content?.parts ?? [])
+      .map((p: any) => p.text ?? '')
+      .join('')
+      .trim();
+    return text || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function summarizeChat(
+  lines: { from: string; text: string }[]
+): Promise<string | null> {
+  const convo = lines.slice(-60).map((l) => `${l.from}: ${l.text}`).join('\n');
+  return gemini(
+    `Summarize this chat conversation in 3-5 short bullet points (plain language, keep names, note any decisions/plans/questions still open). Reply in the conversation's language.\n\n${convo}`
+  );
+}
+
+const translateCache = new Map<string, string>();
+export async function translateText(text: string, targetLang: string): Promise<string | null> {
+  const key = `${targetLang}:${text}`;
+  const hit = translateCache.get(key);
+  if (hit) return hit;
+  const out = await gemini(
+    `Translate the following message into ${targetLang}, preserving tone, emoji and informal style. Reply ONLY with the translation.\n\n"${text}"`,
+    200
+  );
+  if (out) translateCache.set(key, out);
+  return out;
+}
+
+export type ChatMood = 'happy' | 'calm' | 'romantic' | 'serious' | 'neutral';
+const moodCache = new Map<string, ChatMood>();
+export async function detectMood(chatId: string, texts: string[]): Promise<ChatMood> {
+  const hit = moodCache.get(chatId);
+  if (hit) return hit;
+  const out = await gemini(
+    `Classify the overall mood of this conversation as exactly one word from: happy, calm, romantic, serious, neutral.\n\n${texts.slice(-15).join('\n')}`,
+    10
+  );
+  const mood = (['happy', 'calm', 'romantic', 'serious'].includes((out ?? '').toLowerCase().trim())
+    ? (out as string).toLowerCase().trim()
+    : 'neutral') as ChatMood;
+  moodCache.set(chatId, mood);
+  return mood;
+}
