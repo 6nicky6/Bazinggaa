@@ -32,6 +32,7 @@ export type Contact = {
   group: 'Friends' | 'Family' | 'Work';
   online: boolean;
   lastSeenAt?: number;
+  avatarUrl?: string; // real profile photo
 };
 
 export type Chat = {
@@ -82,4 +83,5 @@ export type Profile = {
   statusText: string;
   avatarEmoji: string;
   avatarGradient: readonly [string, string];
+  avatarUri?: string; // real photo (local; uploads in live mode)
 };

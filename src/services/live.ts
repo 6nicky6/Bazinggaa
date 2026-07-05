@@ -150,6 +150,7 @@ export async function loadAll(): Promise<LiveData | null> {
       group: 'Friends',
       online: false, // presence channel flips this in the store
       lastSeenAt: p.last_seen_at ? new Date(p.last_seen_at).getTime() : undefined,
+      avatarUrl: p.avatar_url ?? undefined,
     }));
 
     // my chats: direct → other member = contactId; group/channel → name/icon/members
@@ -342,6 +343,18 @@ export async function uploadMedia(
   }
 }
 export const uploadImage = (chatId: string, uri: string) => uploadMedia(chatId, uri, 'image');
+
+// real profile photo: upload + save on profile (tolerant pre-v3)
+export async function uploadAvatar(localUri: string): Promise<string | null> {
+  if (!supabase) return null;
+  const uid = await myUserId();
+  if (!uid) return null;
+  const url = await uploadMedia(`avatars-${uid}`, localUri, 'image');
+  if (!url) return null;
+  const { error } = await supabase.from('profiles').update({ avatar_url: url }).eq('id', uid);
+  if (error) console.warn('[live] avatar save:', error.message);
+  return url;
+}
 
 export async function sendMessageLive(
   chatId: string,

@@ -11,6 +11,7 @@ import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
 import { aiProviderName } from '../services/ai';
+import { uploadAvatar } from '../services/live';
 import { backendMode } from '../services/supabase';
 
 export default function ProfileScreen({ navigation }: any) {
@@ -37,7 +38,32 @@ export default function ProfileScreen({ navigation }: any) {
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
         {/* identity */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.identity}>
-          <Avatar gradient={profile.avatarGradient} label={profile.avatarEmoji} size={96} />
+          <PressableScale
+            haptic={false}
+            onPress={async () => {
+              try {
+                const ImagePicker = require('expo-image-picker');
+                const res = await ImagePicker.launchImageLibraryAsync({
+                  mediaTypes: ['images'], quality: 0.8, allowsEditing: true, aspect: [1, 1],
+                });
+                const uri = res?.assets?.[0]?.uri;
+                if (uri) {
+                  updateProfile({ avatarUri: uri });
+                  uploadAvatar(uri); // live: syncs so others see it (no-op in demo)
+                }
+              } catch {}
+            }}
+          >
+            <Avatar
+              gradient={profile.avatarGradient}
+              label={profile.avatarEmoji}
+              size={96}
+              imageUri={profile.avatarUri}
+            />
+            <View style={styles.cameraBadge}>
+              <Ionicons name="camera" size={13} color={colors.white} />
+            </View>
+          </PressableScale>
           <Text style={styles.name}>{profile.name || 'You'}</Text>
           <Text style={styles.username}>@{profile.username || 'you'} · {profile.phone}</Text>
           <Text style={styles.statusText}>{profile.statusText}</Text>
@@ -326,4 +352,10 @@ const styles = StyleSheet.create({
   starredFrom: { color: colors.yellow, fontSize: 12.5, fontFamily: fonts.semiBold },
   starredText: { color: colors.white, fontSize: 14, fontFamily: fonts.regular, marginTop: 3 },
   starredDate: { color: colors.textTertiary, fontSize: 11, fontFamily: fonts.regular, marginTop: 3 },
+  cameraBadge: {
+    position: 'absolute', right: 0, bottom: 2,
+    width: 28, height: 28, borderRadius: 14, backgroundColor: colors.red,
+    borderWidth: 2, borderColor: colors.black,
+    alignItems: 'center', justifyContent: 'center',
+  },
 });

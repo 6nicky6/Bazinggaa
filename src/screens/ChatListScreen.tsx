@@ -218,6 +218,7 @@ export default function ChatListScreen({ navigation }: any) {
                 label={item.contact.initials}
                 size={54}
                 online={item.contact.online}
+                imageUri={item.contact.avatarUrl}
               />
               <View style={styles.rowBody}>
                 <View style={styles.rowTop}>

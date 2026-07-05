@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
@@ -9,10 +9,29 @@ type Props = {
   label: string; // initials or emoji
   size?: number;
   online?: boolean;
+  imageUri?: string; // real photo takes precedence
 };
 
-export default function Avatar({ gradient, label, size = 52, online }: Props) {
+export default function Avatar({ gradient, label, size = 52, online, imageUri }: Props) {
   const isEmoji = /\p{Extended_Pictographic}/u.test(label);
+  if (imageUri) {
+    return (
+      <View>
+        <Image
+          source={{ uri: imageUri }}
+          style={{ width: size, height: size, borderRadius: size / 2 }}
+        />
+        {online && (
+          <View
+            style={[
+              styles.dot,
+              { width: size * 0.25, height: size * 0.25, borderRadius: size * 0.125 },
+            ]}
+          />
+        )}
+      </View>
+    );
+  }
   return (
     <View>
       <LinearGradient

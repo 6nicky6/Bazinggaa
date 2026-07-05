@@ -275,7 +275,7 @@ export default function ChatScreen({ navigation, route }: any) {
         <PressableScale onPress={() => navigation.goBack()} haptic={false} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.white} />
         </PressableScale>
-        <Avatar gradient={display.gradient} label={display.initials} size={40} online={display.online} />
+        <Avatar gradient={display.gradient} label={display.initials} size={40} online={display.online} imageUri={contact?.avatarUrl} />
         <View style={{ flex: 1, marginLeft: 11 }}>
           <Text style={styles.headerName}>{display.name}</Text>
           <Text style={[styles.headerStatus, typing && { color: colors.yellow }]}>
