@@ -23,6 +23,7 @@ export type Message = {
   missedCall?: boolean; // renders as a centered "missed call" pill
   contactCard?: { id: string; name: string; username: string }; // shared contact
   poll?: { q: string; options: string[] }; // votes live in reactions (1️⃣ 2️⃣ …)
+  sticker?: string; // big floating emoji sticker (no bubble)
 };
 
 export type Contact = {
@@ -72,6 +73,7 @@ export type Moment = {
   expiresAt: number;
   views: string[]; // viewer ids
   audience?: MomentAudience;
+  imageUrl?: string; // photo moment (full-bleed background)
 };
 
 export type CallLog = {

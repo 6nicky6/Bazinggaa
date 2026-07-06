@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ImageBackground, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
@@ -68,6 +68,20 @@ export default function MomentViewerScreen({ navigation, route }: any) {
         end={{ x: 1, y: 1 }}
         style={styles.container}
       >
+        {moment.imageUrl && (
+          // photo moment: full-bleed image + scrim so text/controls stay readable
+          <>
+            <ImageBackground
+              source={{ uri: moment.imageUrl }}
+              style={StyleSheet.absoluteFill as any}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.1)', 'rgba(0,0,0,0.55)']}
+              style={StyleSheet.absoluteFill as any}
+            />
+          </>
+        )}
         {/* progress bars */}
         <View style={styles.bars}>
           {moments.map((m, i) => (

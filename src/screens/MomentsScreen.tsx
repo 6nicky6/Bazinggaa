@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown } from 'react-native-reanimated';
@@ -74,7 +74,11 @@ export default function MomentsScreen({ navigation }: any) {
                   end={{ x: 1, y: 1 }}
                   style={styles.momentThumb}
                 >
-                  <Text numberOfLines={3} style={styles.momentThumbText}>{m.text}</Text>
+                  {m.imageUrl ? (
+                    <Image source={{ uri: m.imageUrl }} style={styles.momentThumbImg} resizeMode="cover" />
+                  ) : (
+                    <Text numberOfLines={3} style={styles.momentThumbText}>{m.text}</Text>
+                  )}
                 </LinearGradient>
                 <View style={{ flex: 1, marginLeft: 13 }}>
                   <Text style={styles.momentName}>You</Text>
@@ -161,6 +165,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', padding: 6,
   },
   momentThumbText: { color: colors.white, fontSize: 7.5, fontFamily: fonts.semiBold, textAlign: 'center' },
+  momentThumbImg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 16 },
   ring: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
   ringInner: {
     width: 54, height: 54, borderRadius: 27, backgroundColor: colors.black,

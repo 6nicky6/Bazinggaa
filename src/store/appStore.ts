@@ -182,7 +182,7 @@ type State = {
   deleteChat: (chatId: string) => void;
   block: (contactId: string) => void;
   unblock: (contactId: string) => void;
-  postMoment: (text: string, gradient: readonly [string, string], audience?: MomentAudience) => void;
+  postMoment: (text: string, gradient: readonly [string, string], audience?: MomentAudience, imageUri?: string) => void;
   circles: { close: string[]; family: string[] };
   toggleCircle: (contactId: string, circle: 'close' | 'family') => void;
   viewMoment: (momentId: string) => void;
@@ -818,18 +818,26 @@ export const useAppStore = create<State>()(
         if (isLive) live.unblockLive(contactId);
       },
 
-      postMoment: (text, gradient, audience = 'everyone') => {
+      postMoment: (text, gradient, audience = 'everyone', imageUri) => {
         set((st) => ({
           moments: [
             {
               id: uid(), authorId: 'me', text, gradient, audience,
               createdAt: Date.now(), expiresAt: Date.now() + 24 * 3_600_000,
-              views: [],
+              views: [], imageUrl: imageUri,
             },
             ...st.moments,
           ],
         }));
-        if (isLive) live.postMomentLive(text, gradient, audience); // realtime refresh syncs real id
+        if (!isLive) return;
+        if (imageUri) {
+          // photo moment: upload first, then post with the public URL
+          live.uploadMedia('moments', imageUri, 'image').then((url) => {
+            live.postMomentLive(text, gradient, audience, url ?? undefined);
+          });
+        } else {
+          live.postMomentLive(text, gradient, audience); // realtime refresh syncs real id
+        }
       },
 
       circles: { close: [], family: [] },

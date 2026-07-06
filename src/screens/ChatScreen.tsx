@@ -18,7 +18,8 @@ import { avatarGradients, colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
 import { ChatMood, detectMood, smartReplies, summarizeChat, translateText } from '../services/ai';
-import { contactCardContent, messageExtras, pollContent, reportLive } from '../services/live';
+import { contactCardContent, messageExtras, pollContent, reportLive, stickerContent } from '../services/live';
+import { STICKER_PACKS } from '../data/discover';
 import * as ImagePicker from 'expo-image-picker';
 import { playRecord } from '../services/sounds';
 import { backendMode } from '../services/supabase';
@@ -120,6 +121,7 @@ export default function ChatScreen({ navigation, route }: any) {
   const [recSecs, setRecSecs] = useState(0);
   const recLockedRef = React.useRef(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
+  const [emojiTab, setEmojiTab] = useState<'emoji' | 'stickers'>('emoji');
   const [contactPickOpen, setContactPickOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
   const [pollQ, setPollQ] = useState('');
@@ -455,6 +457,24 @@ export default function ChatScreen({ navigation, route }: any) {
           }
           const mine = m.senderId === 'me';
           const extras = messageExtras(m);
+          if (extras.sticker && !m.deleted) {
+            // stickers float free — no bubble, WhatsApp-style
+            return (
+              <Animated.View entering={ZoomIn.springify().damping(14)}>
+                <Pressable
+                  onLongPress={() => setActionMsg(m)}
+                  delayLongPress={300}
+                  style={[styles.stickerMsg, mine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}
+                >
+                  <Text style={styles.stickerBig}>{extras.sticker}</Text>
+                  <View style={[styles.metaRow, { alignSelf: mine ? 'flex-end' : 'flex-start' }]}>
+                    <Text style={styles.metaText}>{timeStr(m.sentAt)}</Text>
+                    {mine && <Ticks status={m.status} />}
+                  </View>
+                </Pressable>
+              </Animated.View>
+            );
+          }
           const quoted = m.replyToId ? messages.find((x) => x.id === m.replyToId) : undefined;
           const quotedName = quoted
             ? quoted.senderId === 'me'
@@ -662,12 +682,48 @@ export default function ChatScreen({ navigation, route }: any) {
         ) : (
           <>
           {emojiOpen && !recording && (
-            <Animated.View entering={FadeInUp.duration(220)} style={styles.emojiStrip}>
-              {QUICK_EMOJIS.map((e) => (
-                <Pressable key={e} hitSlop={4} onPress={() => setDraft((d) => d + e)}>
-                  <Text style={styles.emojiItem}>{e}</Text>
-                </Pressable>
-              ))}
+            <Animated.View entering={FadeInUp.duration(220)}>
+              {/* Emoji | Stickers switcher */}
+              <View style={styles.panelTabs}>
+                {(['emoji', 'stickers'] as const).map((t) => (
+                  <Pressable key={t} onPress={() => setEmojiTab(t)} style={[styles.panelTab, emojiTab === t && styles.panelTabOn]}>
+                    <Text style={[styles.panelTabText, emojiTab === t && { color: colors.white }]}>
+                      {t === 'emoji' ? '😊 Emoji' : '⚡ Stickers'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              {emojiTab === 'emoji' ? (
+                <View style={styles.emojiStrip}>
+                  {QUICK_EMOJIS.map((e) => (
+                    <Pressable key={e} hitSlop={4} onPress={() => setDraft((d) => d + e)}>
+                      <Text style={styles.emojiItem}>{e}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.stickerPanel}>
+                  {STICKER_PACKS.map((pack) => (
+                    <View key={pack.id}>
+                      <Text style={styles.stickerPackName}>{pack.name}</Text>
+                      <View style={styles.stickerRow}>
+                        {pack.emojis.map((e) => (
+                          <Pressable
+                            key={e}
+                            hitSlop={4}
+                            onPress={() => {
+                              sendMessage(chatId, stickerContent(e));
+                              setEmojiOpen(false);
+                            }}
+                          >
+                            <Text style={styles.stickerItem}>{e}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
             </Animated.View>
           )}
           <View style={styles.inputBar}>
@@ -1180,6 +1236,25 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   emojiItem: { fontSize: 24 },
+  panelTabs: {
+    flexDirection: 'row', gap: 8, justifyContent: 'center',
+    paddingTop: 8,
+  },
+  panelTab: {
+    borderRadius: 999, paddingHorizontal: 14, paddingVertical: 6,
+    backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder,
+  },
+  panelTabOn: { backgroundColor: 'rgba(225,6,0,0.25)', borderColor: 'rgba(225,6,0,0.45)' },
+  panelTabText: { color: colors.textSecondary, fontSize: 12.5, fontFamily: fonts.semiBold },
+  stickerPanel: { paddingHorizontal: 16, paddingVertical: 8, gap: 4, maxHeight: 260 },
+  stickerPackName: {
+    color: colors.textTertiary, fontSize: 10.5, fontFamily: fonts.semiBold,
+    textTransform: 'uppercase', letterSpacing: 1.2, marginTop: 6, marginBottom: 4,
+  },
+  stickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  stickerItem: { fontSize: 34 },
+  stickerMsg: { marginVertical: 2, maxWidth: '78%' },
+  stickerBig: { fontSize: 72, lineHeight: 84 },
   pickerTitle: {
     color: colors.white, fontSize: 16, fontFamily: fonts.semiBold,
     marginBottom: 10, paddingHorizontal: 14, paddingTop: 4,

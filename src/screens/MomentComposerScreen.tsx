@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import {
-  KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View,
+  Image, ImageBackground, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
+import * as ImagePicker from 'expo-image-picker';
 import PressableScale from '../components/PressableScale';
 import { colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
@@ -20,59 +21,69 @@ export default function MomentComposerScreen({ navigation }: any) {
   const [text, setText] = useState('');
   const [grad, setGrad] = useState<readonly [string, string]>(gradients.avatar1);
   const [audience, setAudience] = useState<'everyone' | 'close' | 'family'>('everyone');
+  const [imageUri, setImageUri] = useState<string | null>(null);
   const AUDIENCES = [
     { key: 'everyone' as const, label: 'Everyone', icon: 'earth' as const },
     { key: 'close' as const, label: 'Close Friends', icon: 'star' as const },
     { key: 'family' as const, label: 'Family', icon: 'home' as const },
   ];
 
+  const pickPhoto = async () => {
+    try {
+      const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.5, exif: false });
+      if (!res.canceled && res.assets?.[0]?.uri) setImageUri(res.assets[0].uri);
+    } catch {}
+  };
+
+  const canPost = !!text.trim() || !!imageUri;
   const post = () => {
-    if (!text.trim()) return;
-    postMoment(text.trim(), grad, audience);
+    if (!canPost) return;
+    postMoment(text.trim(), grad, audience, imageUri ?? undefined);
     navigation.goBack();
   };
 
-  return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
-        <Animated.View entering={FadeInDown.duration(400)} style={styles.topBar}>
-          <PressableScale onPress={() => navigation.goBack()} style={styles.topBtn}>
-            <Ionicons name="close" size={24} color={colors.white} />
-          </PressableScale>
-          <Text style={styles.topTitle}>New Moment</Text>
-          <View style={{ width: 42 }} />
-        </Animated.View>
+  const inner = (
+    <>
+      <Animated.View entering={FadeInDown.duration(400)} style={styles.topBar}>
+        <PressableScale onPress={() => navigation.goBack()} style={styles.topBtn}>
+          <Ionicons name="close" size={24} color={colors.white} />
+        </PressableScale>
+        <Text style={styles.topTitle}>New Moment</Text>
+        <PressableScale onPress={imageUri ? () => setImageUri(null) : pickPhoto} style={styles.topBtn}>
+          <Ionicons name={imageUri ? 'trash-outline' : 'image-outline'} size={21} color={colors.white} />
+        </PressableScale>
+      </Animated.View>
 
-        <View style={styles.center}>
-          <TextInput
-            style={styles.input}
-            value={text}
-            onChangeText={setText}
-            placeholder="Type something…"
-            placeholderTextColor="rgba(255,255,255,0.6)"
-            multiline
-            maxLength={220}
-            autoFocus
-          />
+      <View style={styles.center}>
+        <TextInput
+          style={[styles.input, imageUri && styles.inputOnPhoto]}
+          value={text}
+          onChangeText={setText}
+          placeholder={imageUri ? 'Add a caption…' : 'Type something…'}
+          placeholderTextColor="rgba(255,255,255,0.6)"
+          multiline
+          maxLength={220}
+          autoFocus={!imageUri}
+        />
+      </View>
+
+      <Animated.View entering={FadeInUp.duration(400)} style={styles.bottom}>
+        <View style={styles.audienceRow}>
+          {AUDIENCES.map((a) => (
+            <PressableScale
+              key={a.key}
+              scaleTo={0.92}
+              style={[styles.audiencePill, audience === a.key && styles.audiencePillActive]}
+              onPress={() => setAudience(a.key)}
+            >
+              <Ionicons name={a.icon} size={13} color={audience === a.key ? colors.black : colors.white} />
+              <Text style={[styles.audienceText, audience === a.key && { color: colors.black }]}>
+                {a.label}
+              </Text>
+            </PressableScale>
+          ))}
         </View>
-
-        <Animated.View entering={FadeInUp.duration(400)} style={styles.bottom}>
-          <View style={styles.audienceRow}>
-            {AUDIENCES.map((a) => (
-              <PressableScale
-                key={a.key}
-
-                scaleTo={0.92}
-                style={[styles.audiencePill, audience === a.key && styles.audiencePillActive]}
-                onPress={() => setAudience(a.key)}
-              >
-                <Ionicons name={a.icon} size={13} color={audience === a.key ? colors.black : colors.white} />
-                <Text style={[styles.audienceText, audience === a.key && { color: colors.black }]}>
-                  {a.label}
-                </Text>
-              </PressableScale>
-            ))}
-          </View>
+        {!imageUri && (
           <View style={styles.gradRow}>
             {GRADS.map((g, i) => (
               <PressableScale key={i} onPress={() => setGrad(g)} scaleTo={0.85}>
@@ -85,15 +96,34 @@ export default function MomentComposerScreen({ navigation }: any) {
               </PressableScale>
             ))}
           </View>
-          <PressableScale onPress={post} style={[styles.postBtn, !text.trim() && { opacity: 0.4 }]} disabled={!text.trim()}>
-            <View style={styles.postBtnInner}>
-              <Text style={styles.postText}>Share Moment</Text>
-              <Ionicons name="flash" size={16} color={colors.yellow} />
-            </View>
-          </PressableScale>
-          <Text style={styles.expiry}>Visible to friends · disappears in 24h</Text>
-        </Animated.View>
-      </LinearGradient>
+        )}
+        <PressableScale onPress={post} style={[styles.postBtn, !canPost && { opacity: 0.4 }]} disabled={!canPost}>
+          <View style={styles.postBtnInner}>
+            <Text style={styles.postText}>Share Moment</Text>
+            <Ionicons name="flash" size={16} color={colors.yellow} />
+          </View>
+        </PressableScale>
+        <Text style={styles.expiry}>Visible to friends · disappears in 24h</Text>
+      </Animated.View>
+    </>
+  );
+
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {imageUri ? (
+        // photo moment: the picture IS the background, gradient scrim keeps text readable
+        <ImageBackground source={{ uri: imageUri }} style={styles.container} resizeMode="cover">
+          <LinearGradient
+            colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0.15)', 'rgba(0,0,0,0.55)']}
+            style={StyleSheet.absoluteFill as any}
+          />
+          {inner}
+        </ImageBackground>
+      ) : (
+        <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
+          {inner}
+        </LinearGradient>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -114,6 +144,7 @@ const styles = StyleSheet.create({
     color: colors.white, fontSize: 30, fontFamily: fonts.display,
     textAlign: 'center', lineHeight: 40,
   },
+  inputOnPhoto: { fontSize: 22, lineHeight: 30, textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 8 },
   bottom: { paddingHorizontal: 24, paddingBottom: 38 },
   gradRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 18 },
   audienceRow: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginBottom: 14 },

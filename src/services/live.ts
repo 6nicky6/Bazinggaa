@@ -205,6 +205,7 @@ export async function loadAll(): Promise<LiveData | null> {
       createdAt: new Date(m.created_at).getTime(),
       expiresAt: new Date(m.expires_at).getTime(),
       views: (m.moment_views ?? []).map((v: any) => (v.viewer_id === uid ? 'me' : v.viewer_id)),
+      imageUrl: m.image_url ?? undefined,
     }));
 
     const blocked = (blocksQ.data ?? []).map((b: any) => b.blocked_id as string);
@@ -260,6 +261,9 @@ export async function inlineMediaContent(
 
 const CONTACT_MARK = '⟦bzc⟧';
 const POLL_MARK = '⟦bzp⟧';
+const STICKER_MARK = '⟦bzs⟧';
+
+export const stickerContent = (emoji: string) => `${STICKER_MARK}${emoji}`;
 
 // Build marker contents for schema-free rich messages (same trick as inline media)
 export const contactCardContent = (c: { id: string; name: string; username: string }) =>
@@ -274,11 +278,19 @@ export function messageExtras(m: {
   text: string;
   contactCard?: { id: string; name: string; username: string };
   poll?: { q: string; options: string[] };
-}): { contactCard?: { id: string; name: string; username: string }; poll?: { q: string; options: string[] } } {
-  if (m.contactCard || m.poll) return { contactCard: m.contactCard, poll: m.poll };
+  sticker?: string;
+}): {
+  contactCard?: { id: string; name: string; username: string };
+  poll?: { q: string; options: string[] };
+  sticker?: string;
+} {
+  if (m.contactCard || m.poll || m.sticker) {
+    return { contactCard: m.contactCard, poll: m.poll, sticker: m.sticker };
+  }
   try {
     if (m.text?.startsWith(CONTACT_MARK)) return { contactCard: JSON.parse(m.text.slice(CONTACT_MARK.length)) };
     if (m.text?.startsWith(POLL_MARK)) return { poll: JSON.parse(m.text.slice(POLL_MARK.length)) };
+    if (m.text?.startsWith(STICKER_MARK)) return { sticker: m.text.slice(STICKER_MARK.length) };
   } catch {}
   return {};
 }
@@ -287,6 +299,7 @@ function parseInline(content: string): {
   text: string; audioUrl?: string; audioDurationSec?: number; imageUrl?: string;
   contactCard?: { id: string; name: string; username: string };
   poll?: { q: string; options: string[] };
+  sticker?: string;
 } {
   if (content?.startsWith(AUDIO_MARK)) {
     const end = content.indexOf('⟧');
@@ -314,6 +327,10 @@ function parseInline(content: string): {
       const p = JSON.parse(content.slice(POLL_MARK.length));
       return { text: `📊 Poll: ${p.q ?? ''}`, poll: p };
     }
+    if (content?.startsWith(STICKER_MARK)) {
+      const s = content.slice(STICKER_MARK.length);
+      return { text: `${s} Sticker`, sticker: s };
+    }
   } catch {}
   return { text: content };
 }
@@ -337,6 +354,7 @@ function toMessage(m: any, uid: string): Message {
     forwarded: m.forwarded || undefined,
     contactCard: inline.contactCard,
     poll: inline.poll,
+    sticker: inline.sticker,
   };
 }
 
@@ -492,14 +510,17 @@ export async function sendMessageLive(
 export async function postMomentLive(
   text: string,
   gradient: readonly [string, string],
-  audience: 'everyone' | 'close' | 'family' = 'everyone'
+  audience: 'everyone' | 'close' | 'family' = 'everyone',
+  imageUrl?: string
 ) {
   if (!supabase) return;
   const uid = await myUserId();
   if (!uid) return;
   const base = { author_id: uid, content: text, gradient: gradIndex(gradient) };
-  const { error } = await supabase.from('moments').insert({ ...base, audience });
-  if (error) await supabase.from('moments').insert(base); // pre-v3: no audience column
+  const rich: any = { ...base, audience };
+  if (imageUrl) rich.image_url = imageUrl;
+  const { error } = await supabase.from('moments').insert(rich);
+  if (error) await supabase.from('moments').insert(base); // tolerant: older schema
 }
 
 // circles: owner-only lists powering moment audiences (tolerant pre-v3)
