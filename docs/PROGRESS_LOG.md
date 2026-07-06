@@ -1,5 +1,9 @@
 # Bazingga Progress Log
 
+### 2026-07-07 — ✅ APK #7 BUILT (app.bazingga) — Nikhil's test build
+- APK #7 download: https://expo.dev/artifacts/eas/uImGgsHKSuUEAsCJmSAM8RkBwTnQGw-8oBuv16-bhXc.apk (build eea6e279, commit f15856a, package app.bazingga, new keystore, preview/OTA channel). Installs as a SEPARATE app (new package) — delete old com.nicky.bazingga after confirming. Fixes the fresh-install 6-digit OTP login block; all wave-3 features native (composer redesign, polls, contact cards, stickers, photo Moments, Zing teaser, GIF tab pending key).
+- Pending after test: Giphy/Tenor key (OTA lights up GIFs), FCM push re-link for app.bazingga (browser), then 2-user real-device test → Play Store internal track.
+
 ### 2026-07-07 — Wave 3 batch 3: GIFs (code) + 🏗️ APK #7 BUILDING (app.bazingga)
 - Did: GIF feature fully coded — provider-agnostic service (Tenor OR Giphy, auto-selected by env key), GIF tab in composer (search grid + trending), GIF messages render floating no-bubble, previewLabel prettifier for all markers (fixes sticker/poll/contact list previews too). tsc clean, committed, bundle-verified loading. Contact cards + polls from batch 1 also verified in rig (poll vote synced server-side). Kicked off **APK #7** (EAS build eea6e279, package app.bazingga, new keystore auto-created, preview channel so it OTAs) — this is Nikhil's test build for tomorrow, embeds the fixed 6-digit OTP (kills the fresh-install login block) + all wave-3 features native.
 - Broke: GIF KEY BLOCKED — bazingga GCP org policy forbids unrestricted API keys (must restrict to a specific API), restricting needs Tenor API enabled, and the Tenor enable page in GCP console PERSISTENTLY fails to load ("Failed to load", every attempt/fresh tab). Hard Google-side block. GIF tab gracefully shows "arrive in next update" until a key lands. GIF key is an OTA env var, fully decoupled from APK — does NOT block APK #7.
