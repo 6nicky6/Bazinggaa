@@ -1,5 +1,10 @@
 # Bazingga Progress Log
 
+### 2026-07-06 (night) — Professionalized IDs + bug-list wave + REAL Android emulator rig
+- Did: package renamed com.nicky.bazingga → app.bazingga (permanent, pre-Play-Store; new Firebase app + google-services.json; invite text → bazingga.app). Bug-list wave shipped OTA: bot/Saved self-heal (verified), chat-list ordering (new chats to top), haptics everywhere (57 suppressions removed), Mood Engine visible (header emoji + menu), incoming-call ringtone (looping, stops on connect), missed-calls-in-chat pill (verified). TIER-2 TESTING LIVE: Android SDK + emulator installed (C:\Android, AVD bazingga_pixel, on-demand), APK #6 installed, Claude drove the FULL login autonomously (email → OTP from mail.tm → in). EMULATOR CAUGHT LAUNCH-CLASS BUG: fresh APK#6 installs show 8 OTP boxes vs 6-digit codes → first-login blocked until double-restart applies OTA (verified recovery). 3-tier pyramid: browser rig → emulator → phones.
+- Broke: Nothing. APK #7 now urgent (fixed bundle + app.bazingga + native push); needs new keystore + FCM key re-link for new package.
+- Next: APK #7 build; media picker redesign (design skills); Zing teaser; wave-3 parity.
+
 ### 2026-07-06 (afternoon) — Infra day complete: Firebase + push pipeline + nightly sweep + Brevo SMTP
 - Did: Firebase project bazingga-e8cd2 + Android app registered + google-services.json wired (APK #7 gets native push); Edge Function `push` + DB webhook `push_on_message` deployed and VERIFIED (real insert → 200); FCM key generated (Expo upload = Nikhil's click, pending); nightly test-data sweep: Edge Function `sweep` + pg_cron `nightly-sweep` (0 20 UTC = 00:00 Dubai) deployed + fired manually + VERIFIED (media msgs 0, calls 0, storage empty, avatars kept) — REMOVE AT LAUNCH (task #19); Brevo account (Nikhil) + custom SMTP configured + VERIFIED: OTP arrives in ~5s as "Bazingga ⚡", 6 digits, rate limit now 30/h (was ~2/h). Standing orders saved: Claude calls model/ultracode modes, Nikhil flips switches; brutal-truth cofounder tone; shorts feed = "Zing ⚡".
 - Broke: Nothing. Sender shows @brevosend.com fallback (Gmail can't be DKIM'd) — fix = buy bazingga domain later.
