@@ -18,7 +18,8 @@ import { avatarGradients, colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
 import { ChatMood, detectMood, smartReplies, summarizeChat, translateText } from '../services/ai';
-import { reportLive } from '../services/live';
+import { contactCardContent, messageExtras, pollContent, reportLive } from '../services/live';
+import * as ImagePicker from 'expo-image-picker';
 import { playRecord } from '../services/sounds';
 import { backendMode } from '../services/supabase';
 import { Message } from '../types';
@@ -118,6 +119,11 @@ export default function ChatScreen({ navigation, route }: any) {
   const [recLocked, setRecLocked] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
   const recLockedRef = React.useRef(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const [contactPickOpen, setContactPickOpen] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [pollQ, setPollQ] = useState('');
+  const [pollOpts, setPollOpts] = useState<string[]>(['', '']);
 
   // REAL recording via expo-audio
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -217,6 +223,32 @@ export default function ChatScreen({ navigation, route }: any) {
     setToast(msg);
     setTimeout(() => setToast(''), 2600);
   };
+
+  // WhatsApp-style in-field camera shortcut
+  const quickCamera = async () => {
+    try {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) return;
+      const res = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.4, exif: false });
+      if (!res.canceled && res.assets?.[0]?.uri) sendImage(chatId, res.assets[0].uri);
+    } catch {}
+  };
+
+  const QUICK_EMOJIS = ['😂', '❤️', '😍', '👍', '🙏', '🔥', '😊', '🎉', '😭', '💯', '🤲', '⚡', '😅', '🥰', '👏', '🤝'];
+
+  const sendPollMsg = () => {
+    const opts = pollOpts.map((o) => o.trim()).filter(Boolean);
+    if (!pollQ.trim() || opts.length < 2) {
+      showToast('A poll needs a question and 2+ options');
+      return;
+    }
+    sendMessage(chatId, pollContent(pollQ.trim(), opts.slice(0, 5)));
+    setPollOpen(false);
+    setPollQ('');
+    setPollOpts(['', '']);
+  };
+
+  const POLL_EMOJIS = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣'];
 
   // AI Mood Engine: subtle theme tint from conversation mood (only when the AI
   // toggle is on, enough messages exist, and no manual wallpaper is set)
@@ -422,6 +454,7 @@ export default function ChatScreen({ navigation, route }: any) {
             );
           }
           const mine = m.senderId === 'me';
+          const extras = messageExtras(m);
           const quoted = m.replyToId ? messages.find((x) => x.id === m.replyToId) : undefined;
           const quotedName = quoted
             ? quoted.senderId === 'me'
@@ -461,6 +494,51 @@ export default function ChatScreen({ navigation, route }: any) {
                     <Text style={styles.imageNote}>Not synced · tap to retry</Text>
                   )}
                 </>
+              ) : extras.contactCard ? (
+                <PressableScale
+                  style={styles.contactCard}
+                  scaleTo={0.97}
+                  onPress={async () => {
+                    const cid2 = await useAppStore.getState().ensureChat(extras.contactCard!.id);
+                    if (cid2) navigation.push('Chat', { chatId: cid2 });
+                  }}
+                >
+                  <View style={styles.contactCardAvatar}>
+                    <Text style={{ fontSize: 18 }}>👤</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.contactCardName}>{extras.contactCard.name}</Text>
+                    <Text style={styles.contactCardUser}>@{extras.contactCard.username}</Text>
+                  </View>
+                  <View style={styles.contactCardCta}>
+                    <Ionicons name="chatbubble" size={13} color={colors.yellow} />
+                    <Text style={styles.contactCardCtaText}>Message</Text>
+                  </View>
+                </PressableScale>
+              ) : extras.poll ? (
+                <View style={styles.pollCard}>
+                  <Text style={styles.pollQ}>📊 {extras.poll.q}</Text>
+                  {extras.poll.options.slice(0, 5).map((opt, i) => {
+                    const emoji = POLL_EMOJIS[i];
+                    const voters = m.reactions?.[emoji] ?? [];
+                    const total = POLL_EMOJIS.reduce((n, e) => n + (m.reactions?.[e]?.length ?? 0), 0);
+                    const pct = total ? Math.round((voters.length / total) * 100) : 0;
+                    const iVoted = voters.includes('me');
+                    return (
+                      <Pressable
+                        key={i}
+                        style={[styles.pollOpt, iVoted && styles.pollOptMine]}
+                        onPress={() => reactToMessage(m.id, emoji)}
+                      >
+                        <View style={[styles.pollFill, { width: `${pct}%` }]} pointerEvents="none" />
+                        <Text style={styles.pollOptText} numberOfLines={1}>{opt}</Text>
+                        <Text style={styles.pollPct}>{voters.length > 0 ? `${pct}%` : ''}</Text>
+                        {iVoted && <Ionicons name="checkmark-circle" size={14} color={colors.yellow} />}
+                      </Pressable>
+                    );
+                  })}
+                  <Text style={styles.pollHint}>tap an option to vote</Text>
+                </View>
               ) : m.text ? (
                 <>
                   <Text style={styles.msgText}>{m.text}</Text>
@@ -482,7 +560,8 @@ export default function ChatScreen({ navigation, route }: any) {
               </View>
             </>
           );
-          const reactionChips = m.reactions && Object.keys(m.reactions).length > 0 && (
+          // polls consume their reactions as votes — no chip row for them
+          const reactionChips = !extras.poll && m.reactions && Object.keys(m.reactions).length > 0 && (
             <View style={[styles.reactionRow, mine && { justifyContent: 'flex-end' }]}>
               {(Object.entries(m.reactions) as [string, string[]][]).map(([emoji, ids]) => (
                 <PressableScale
@@ -581,12 +660,19 @@ export default function ChatScreen({ navigation, route }: any) {
             <Text style={styles.blockedText}>You blocked {display.name}.</Text>
           </View>
         ) : (
+          <>
+          {emojiOpen && !recording && (
+            <Animated.View entering={FadeInUp.duration(220)} style={styles.emojiStrip}>
+              {QUICK_EMOJIS.map((e) => (
+                <Pressable key={e} hitSlop={4} onPress={() => setDraft((d) => d + e)}>
+                  <Text style={styles.emojiItem}>{e}</Text>
+                </Pressable>
+              ))}
+            </Animated.View>
+          )}
           <View style={styles.inputBar}>
-            <PressableScale style={styles.inputIcon} onPress={() => setAttachOpen(true)}>
-              <Ionicons name="add" size={24} color={colors.textSecondary} />
-            </PressableScale>
             {recording ? (
-              <View style={[styles.input, styles.recordingBar]}>
+              <View style={[styles.inputShell, styles.recordingBar]}>
                 <View style={styles.recDot} />
                 <Text style={styles.recText}>
                   {recLocked ? '🔒 ' : ''}{Math.floor(recSecs / 60)}:{String(recSecs % 60).padStart(2, '0')}
@@ -600,18 +686,32 @@ export default function ChatScreen({ navigation, route }: any) {
                 )}
               </View>
             ) : (
-              <TextInput
-                style={styles.input}
-                value={draft}
-                onChangeText={(t) => {
-                  setDraft(t);
-                  if (t.trim()) notifyTyping(chatId);
-                }}
-                placeholder="Message"
-                placeholderTextColor={colors.textTertiary}
-                multiline
-                onSubmitEditing={() => send()}
-              />
+              // WhatsApp-style shell: emoji · text · paperclip · camera, all in one pill
+              <View style={styles.inputShell}>
+                <Pressable style={styles.fieldIcon} hitSlop={6} onPress={() => setEmojiOpen((v) => !v)}>
+                  <Ionicons name={emojiOpen ? 'close-circle-outline' : 'happy-outline'} size={22} color={colors.textSecondary} />
+                </Pressable>
+                <TextInput
+                  style={styles.input}
+                  value={draft}
+                  onChangeText={(t) => {
+                    setDraft(t);
+                    if (t.trim()) notifyTyping(chatId);
+                  }}
+                  placeholder="Message"
+                  placeholderTextColor={colors.textTertiary}
+                  multiline
+                  onSubmitEditing={() => send()}
+                />
+                <Pressable style={styles.fieldIcon} hitSlop={6} onPress={() => setAttachOpen(true)}>
+                  <Ionicons name="attach" size={22} color={colors.textSecondary} style={{ transform: [{ rotate: '45deg' }] }} />
+                </Pressable>
+                {!draft.trim() && (
+                  <Pressable style={styles.fieldIcon} hitSlop={6} onPress={quickCamera}>
+                    <Ionicons name="camera-outline" size={22} color={colors.textSecondary} />
+                  </Pressable>
+                )}
+              </View>
             )}
             {draft.trim() || (recording && recLocked) ? (
               // locked recording: the mic morphs into the send button (always visible)
@@ -648,6 +748,7 @@ export default function ChatScreen({ navigation, route }: any) {
               </View>
             )}
           </View>
+          </>
         )}
       </View>
 
@@ -655,8 +756,76 @@ export default function ChatScreen({ navigation, route }: any) {
         visible={attachOpen}
         onClose={() => setAttachOpen(false)}
         onImage={(uri) => sendImage(chatId, uri)}
+        onContact={() => setContactPickOpen(true)}
+        onPoll={() => setPollOpen(true)}
         onComingSoon={(f) => showToast(`${f} arrive in the next update ⚡`)}
       />
+
+      {/* Share a contact */}
+      <Modal visible={contactPickOpen} transparent animationType="fade" onRequestClose={() => setContactPickOpen(false)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setContactPickOpen(false)}>
+          <Animated.View entering={ZoomIn.duration(200)} style={styles.menu}>
+            <Text style={styles.pickerTitle}>Share a contact</Text>
+            {contacts
+              .filter((c) => c.id !== 'bazingga-bot' && c.id !== 'saved-messages' && !c.id.startsWith('official-') && c.id !== chat?.contactId)
+              .slice(0, 8)
+              .map((c) => (
+                <PressableScale
+                  key={c.id}
+                  style={styles.menuItem}
+                  onPress={() => {
+                    sendMessage(chatId, contactCardContent({ id: c.id, name: c.name, username: c.username }));
+                    setContactPickOpen(false);
+                    showToast(`Shared ${c.name} 👤`);
+                  }}
+                >
+                  <Avatar gradient={c.gradient} label={c.initials} size={30} imageUri={c.avatarUrl} />
+                  <Text style={styles.menuText}>{c.name}</Text>
+                  <Text style={[styles.recHint, { marginLeft: 'auto' }]}>@{c.username}</Text>
+                </PressableScale>
+              ))}
+          </Animated.View>
+        </Pressable>
+      </Modal>
+
+      {/* Poll composer */}
+      <Modal visible={pollOpen} transparent animationType="fade" onRequestClose={() => setPollOpen(false)}>
+        <Pressable style={styles.menuBackdrop} onPress={() => setPollOpen(false)}>
+          <Animated.View entering={ZoomIn.duration(200)} style={styles.menu}>
+            <Text style={styles.pickerTitle}>Create a poll 📊</Text>
+            <TextInput
+              style={styles.pollInput}
+              value={pollQ}
+              onChangeText={setPollQ}
+              placeholder="Ask a question…"
+              placeholderTextColor={colors.textTertiary}
+              maxLength={120}
+            />
+            {pollOpts.map((o, i) => (
+              <TextInput
+                key={i}
+                style={styles.pollInput}
+                value={o}
+                onChangeText={(t) => setPollOpts((arr) => arr.map((x, j) => (j === i ? t : x)))}
+                placeholder={`Option ${i + 1}`}
+                placeholderTextColor={colors.textTertiary}
+                maxLength={60}
+              />
+            ))}
+            {pollOpts.length < 5 && (
+              <PressableScale style={styles.menuItem} onPress={() => setPollOpts((a) => [...a, ''])}>
+                <Ionicons name="add-circle-outline" size={18} color={colors.yellow} />
+                <Text style={styles.menuText}>Add option</Text>
+              </PressableScale>
+            )}
+            <PressableScale style={styles.pollSend} onPress={sendPollMsg} scaleTo={0.95}>
+              <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.pollSendInner}>
+                <Text style={styles.pollSendText}>Send poll</Text>
+              </LinearGradient>
+            </PressableScale>
+          </Animated.View>
+        </Pressable>
+      </Modal>
 
       {/* Chat menu: block / report (1:1 chats) */}
       {contact && (
@@ -998,6 +1167,66 @@ const styles = StyleSheet.create({
   recDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.red },
   recText: { color: colors.white, fontSize: 14.5, fontFamily: fonts.semiBold },
   recHint: { color: colors.textTertiary, fontSize: 12, fontFamily: fonts.regular, marginLeft: 'auto', flexShrink: 1 },
+  // WhatsApp-style input shell: icons live INSIDE the pill
+  inputShell: {
+    flex: 1, flexDirection: 'row', alignItems: 'flex-end',
+    backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder,
+    borderRadius: 24, paddingHorizontal: 6, minHeight: 44,
+  },
+  fieldIcon: { paddingHorizontal: 7, paddingVertical: 11 },
+  emojiStrip: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+    paddingHorizontal: 16, paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  emojiItem: { fontSize: 24 },
+  pickerTitle: {
+    color: colors.white, fontSize: 16, fontFamily: fonts.semiBold,
+    marginBottom: 10, paddingHorizontal: 14, paddingTop: 4,
+  },
+  pollInput: {
+    backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder,
+    borderRadius: 14, paddingHorizontal: 14, paddingVertical: 10,
+    color: colors.white, fontSize: 14, fontFamily: fonts.regular,
+    marginHorizontal: 12, marginBottom: 8,
+  },
+  pollSend: { marginHorizontal: 12, marginTop: 6 },
+  pollSendInner: { borderRadius: 18, paddingVertical: 12, alignItems: 'center' },
+  pollSendText: { color: colors.white, fontSize: 14.5, fontFamily: fonts.semiBold },
+  // contact card bubble
+  contactCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    minWidth: 220, paddingVertical: 4,
+  },
+  contactCardAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  contactCardName: { color: colors.white, fontSize: 14.5, fontFamily: fonts.semiBold },
+  contactCardUser: { color: 'rgba(255,255,255,0.65)', fontSize: 12, fontFamily: fonts.regular },
+  contactCardCta: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 14,
+    paddingHorizontal: 10, paddingVertical: 6,
+  },
+  contactCardCtaText: { color: colors.yellow, fontSize: 12, fontFamily: fonts.semiBold },
+  // poll bubble
+  pollCard: { minWidth: 230, maxWidth: 270, paddingVertical: 2, gap: 7 },
+  pollQ: { color: colors.white, fontSize: 14.5, fontFamily: fonts.semiBold, marginBottom: 3 },
+  pollOpt: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12,
+    paddingHorizontal: 11, paddingVertical: 9, overflow: 'hidden',
+  },
+  pollOptMine: { borderWidth: 1, borderColor: 'rgba(246,184,0,0.5)' },
+  pollFill: {
+    position: 'absolute', left: 0, top: 0, bottom: 0,
+    backgroundColor: 'rgba(246,184,0,0.16)',
+  },
+  pollOptText: { color: colors.white, fontSize: 13.5, fontFamily: fonts.medium, flex: 1 },
+  pollPct: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontFamily: fonts.semiBold },
+  pollHint: { color: 'rgba(255,255,255,0.45)', fontSize: 10.5, fontFamily: fonts.regular, alignSelf: 'center', marginTop: 2 },
   recTrash: { marginLeft: 'auto', padding: 4 },
   lockHint: {
     position: 'absolute', bottom: 54, alignSelf: 'center', alignItems: 'center',

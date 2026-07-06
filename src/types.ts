@@ -21,6 +21,8 @@ export type Message = {
   forwarded?: boolean;
   starred?: boolean; // local bookmark (WhatsApp-style star)
   missedCall?: boolean; // renders as a centered "missed call" pill
+  contactCard?: { id: string; name: string; username: string }; // shared contact
+  poll?: { q: string; options: string[] }; // votes live in reactions (1️⃣ 2️⃣ …)
 };
 
 export type Contact = {

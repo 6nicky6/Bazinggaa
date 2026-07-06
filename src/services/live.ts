@@ -258,8 +258,35 @@ export async function inlineMediaContent(
   }
 }
 
+const CONTACT_MARK = '⟦bzc⟧';
+const POLL_MARK = '⟦bzp⟧';
+
+// Build marker contents for schema-free rich messages (same trick as inline media)
+export const contactCardContent = (c: { id: string; name: string; username: string }) =>
+  `${CONTACT_MARK}${JSON.stringify(c)}`;
+export const pollContent = (q: string, options: string[]) =>
+  `${POLL_MARK}${JSON.stringify({ q, options })}`;
+
+// Renderer-side helper: extract rich extras from a message regardless of whether
+// it came parsed from the server (fields set) or is a local optimistic copy
+// still carrying the raw marker text.
+export function messageExtras(m: {
+  text: string;
+  contactCard?: { id: string; name: string; username: string };
+  poll?: { q: string; options: string[] };
+}): { contactCard?: { id: string; name: string; username: string }; poll?: { q: string; options: string[] } } {
+  if (m.contactCard || m.poll) return { contactCard: m.contactCard, poll: m.poll };
+  try {
+    if (m.text?.startsWith(CONTACT_MARK)) return { contactCard: JSON.parse(m.text.slice(CONTACT_MARK.length)) };
+    if (m.text?.startsWith(POLL_MARK)) return { poll: JSON.parse(m.text.slice(POLL_MARK.length)) };
+  } catch {}
+  return {};
+}
+
 function parseInline(content: string): {
   text: string; audioUrl?: string; audioDurationSec?: number; imageUrl?: string;
+  contactCard?: { id: string; name: string; username: string };
+  poll?: { q: string; options: string[] };
 } {
   if (content?.startsWith(AUDIO_MARK)) {
     const end = content.indexOf('⟧');
@@ -278,6 +305,16 @@ function parseInline(content: string): {
     const mime = b64.startsWith('iVBOR') ? 'image/png' : 'image/jpeg'; // sniff PNG header
     return { text: '📷 Photo', imageUrl: `data:${mime};base64,${b64}` };
   }
+  try {
+    if (content?.startsWith(CONTACT_MARK)) {
+      const c = JSON.parse(content.slice(CONTACT_MARK.length));
+      return { text: `👤 ${c.name ?? 'Contact'}`, contactCard: c };
+    }
+    if (content?.startsWith(POLL_MARK)) {
+      const p = JSON.parse(content.slice(POLL_MARK.length));
+      return { text: `📊 Poll: ${p.q ?? ''}`, poll: p };
+    }
+  } catch {}
   return { text: content };
 }
 
@@ -298,6 +335,8 @@ function toMessage(m: any, uid: string): Message {
     reactions: m.reactions && Object.keys(m.reactions).length ? remapReactions(m.reactions, uid) : undefined,
     deleted: m.deleted || undefined,
     forwarded: m.forwarded || undefined,
+    contactCard: inline.contactCard,
+    poll: inline.poll,
   };
 }
 

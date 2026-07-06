@@ -52,6 +52,26 @@ export default function BazinggaPlusScreen({ navigation }: any) {
           </Animated.View>
         ))}
 
+        {/* Zing ⚡ — the shorts feed, teased ahead of launch */}
+        <Animated.View entering={FadeInDown.delay(520).duration(400)}>
+          <View style={styles.zingCard}>
+            <View style={styles.zingBadge}>
+              <Text style={{ fontSize: 22 }}>⚡</Text>
+            </View>
+            <View style={{ flex: 1, marginLeft: 13 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.zingTitle}>Zing</Text>
+                <View style={styles.zingSoon}>
+                  <Text style={styles.zingSoonText}>COMING SOON</Text>
+                </View>
+              </View>
+              <Text style={styles.zingDesc}>
+                Short videos from creators you love — swipe, react, share. The feed is warming up.
+              </Text>
+            </View>
+          </View>
+        </Animated.View>
+
         <Animated.View entering={FadeInDown.delay(560).duration(400)} style={{ paddingHorizontal: 24, marginTop: 18 }}>
           <PressableScale style={styles.ctaShadow}>
             <LinearGradient colors={gradients.primary} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.cta}>
@@ -87,6 +107,24 @@ const styles = StyleSheet.create({
   },
   perkTitle: { color: colors.white, fontSize: 15, fontFamily: fonts.semiBold },
   perkDesc: { color: colors.textSecondary, fontSize: 12.5, fontFamily: fonts.regular, marginTop: 2 },
+  zingCard: {
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 24, marginTop: 6, marginBottom: 6, padding: 16, borderRadius: 20,
+    backgroundColor: 'rgba(246,184,0,0.07)',
+    borderWidth: 1, borderColor: 'rgba(246,184,0,0.22)',
+  },
+  zingBadge: {
+    width: 46, height: 46, borderRadius: 16,
+    backgroundColor: 'rgba(246,184,0,0.14)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  zingTitle: { color: colors.white, fontSize: 17, fontFamily: fonts.display },
+  zingSoon: {
+    borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3,
+    backgroundColor: 'rgba(246,184,0,0.16)',
+  },
+  zingSoonText: { color: colors.yellow, fontSize: 8.5, fontFamily: fonts.bold, letterSpacing: 1.4 },
+  zingDesc: { color: colors.textSecondary, fontSize: 12, fontFamily: fonts.regular, marginTop: 3, lineHeight: 17 },
   ctaShadow: {
     borderRadius: 28, shadowColor: colors.red, shadowOpacity: 0.5,
     shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 10,
