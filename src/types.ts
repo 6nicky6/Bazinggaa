@@ -24,6 +24,7 @@ export type Message = {
   contactCard?: { id: string; name: string; username: string }; // shared contact
   poll?: { q: string; options: string[] }; // votes live in reactions (1️⃣ 2️⃣ …)
   sticker?: string; // big floating emoji sticker (no bubble)
+  gifUrl?: string; // animated GIF (Tenor-hosted url, no bubble)
 };
 
 export type Contact = {

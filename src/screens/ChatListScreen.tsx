@@ -11,6 +11,7 @@ import Avatar from '../components/Avatar';
 import { colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { liveMoments, useAppStore } from '../store/appStore';
+import { previewLabel } from '../services/live';
 import { ChatFilter } from '../types';
 
 const FILTERS: ChatFilter[] = ['All', 'Friends', 'Family', 'Work'];
@@ -250,7 +251,7 @@ export default function ChatListScreen({ navigation }: any) {
                     <Text style={styles.preview} numberOfLines={1}>
                       {item.last
                         ? (item.last.senderId === 'me' ? 'You: ' : '') +
-                          (item.last.imageUri ? '📷 Photo' : item.last.text)
+                          (item.last.imageUri ? '📷 Photo' : previewLabel(item.last.text))
                         : 'Say hi 👋'}
                     </Text>
                   )}

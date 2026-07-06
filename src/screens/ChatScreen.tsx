@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Modal, PanResponder, Platform, Pressable,
+  ScrollView, StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { AudioModule, RecordingPresets, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
@@ -18,8 +19,9 @@ import { avatarGradients, colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
 import { ChatMood, detectMood, smartReplies, summarizeChat, translateText } from '../services/ai';
-import { contactCardContent, messageExtras, pollContent, reportLive, stickerContent } from '../services/live';
+import { contactCardContent, gifContent, messageExtras, pollContent, reportLive, stickerContent } from '../services/live';
 import { STICKER_PACKS } from '../data/discover';
+import { type Gif, gifsEnabled, searchGifs, trendingGifs } from '../services/gifs';
 import * as ImagePicker from 'expo-image-picker';
 import { playRecord } from '../services/sounds';
 import { backendMode } from '../services/supabase';
@@ -121,7 +123,10 @@ export default function ChatScreen({ navigation, route }: any) {
   const [recSecs, setRecSecs] = useState(0);
   const recLockedRef = React.useRef(false);
   const [emojiOpen, setEmojiOpen] = useState(false);
-  const [emojiTab, setEmojiTab] = useState<'emoji' | 'stickers'>('emoji');
+  const [emojiTab, setEmojiTab] = useState<'emoji' | 'stickers' | 'gifs'>('emoji');
+  const [gifQuery, setGifQuery] = useState('');
+  const [gifs, setGifs] = useState<Gif[]>([]);
+  const [gifsLoading, setGifsLoading] = useState(false);
   const [contactPickOpen, setContactPickOpen] = useState(false);
   const [pollOpen, setPollOpen] = useState(false);
   const [pollQ, setPollQ] = useState('');
@@ -237,6 +242,24 @@ export default function ChatScreen({ navigation, route }: any) {
   };
 
   const QUICK_EMOJIS = ['😂', '❤️', '😍', '👍', '🙏', '🔥', '😊', '🎉', '😭', '💯', '🤲', '⚡', '😅', '🥰', '👏', '🤝'];
+
+  // load GIFs when the tab opens or the query changes (debounced)
+  useEffect(() => {
+    if (!emojiOpen || emojiTab !== 'gifs' || !gifsEnabled()) return;
+    let alive = true;
+    setGifsLoading(true);
+    const t = setTimeout(async () => {
+      const out = gifQuery.trim() ? await searchGifs(gifQuery) : await trendingGifs();
+      if (alive) { setGifs(out); setGifsLoading(false); }
+    }, gifQuery.trim() ? 350 : 0);
+    return () => { alive = false; clearTimeout(t); };
+  }, [emojiOpen, emojiTab, gifQuery]);
+
+  const sendGif = (g: Gif) => {
+    sendMessage(chatId, gifContent(g.full));
+    setEmojiOpen(false);
+    setGifQuery('');
+  };
 
   const sendPollMsg = () => {
     const opts = pollOpts.map((o) => o.trim()).filter(Boolean);
@@ -475,6 +498,25 @@ export default function ChatScreen({ navigation, route }: any) {
               </Animated.View>
             );
           }
+          if (extras.gifUrl && !m.deleted) {
+            // GIFs float free too — rounded animated image, no bubble
+            return (
+              <Animated.View entering={ZoomIn.springify().damping(16)}>
+                <Pressable
+                  onLongPress={() => setActionMsg(m)}
+                  delayLongPress={300}
+                  style={[styles.gifMsg, mine ? { alignSelf: 'flex-end' } : { alignSelf: 'flex-start' }]}
+                >
+                  <Image source={{ uri: extras.gifUrl }} style={styles.gifImage} resizeMode="cover" />
+                  <View style={styles.gifTag}><Text style={styles.gifTagText}>GIF</Text></View>
+                  <View style={[styles.metaRow, { alignSelf: mine ? 'flex-end' : 'flex-start' }]}>
+                    <Text style={styles.metaText}>{timeStr(m.sentAt)}</Text>
+                    {mine && <Ticks status={m.status} />}
+                  </View>
+                </Pressable>
+              </Animated.View>
+            );
+          }
           const quoted = m.replyToId ? messages.find((x) => x.id === m.replyToId) : undefined;
           const quotedName = quoted
             ? quoted.senderId === 'me'
@@ -683,12 +725,12 @@ export default function ChatScreen({ navigation, route }: any) {
           <>
           {emojiOpen && !recording && (
             <Animated.View entering={FadeInUp.duration(220)}>
-              {/* Emoji | Stickers switcher */}
+              {/* Emoji | Stickers | GIFs switcher */}
               <View style={styles.panelTabs}>
-                {(['emoji', 'stickers'] as const).map((t) => (
+                {(['emoji', 'stickers', 'gifs'] as const).map((t) => (
                   <Pressable key={t} onPress={() => setEmojiTab(t)} style={[styles.panelTab, emojiTab === t && styles.panelTabOn]}>
                     <Text style={[styles.panelTabText, emojiTab === t && { color: colors.white }]}>
-                      {t === 'emoji' ? '😊 Emoji' : '⚡ Stickers'}
+                      {t === 'emoji' ? '😊 Emoji' : t === 'stickers' ? '⚡ Stickers' : '▶ GIFs'}
                     </Text>
                   </Pressable>
                 ))}
@@ -701,7 +743,7 @@ export default function ChatScreen({ navigation, route }: any) {
                     </Pressable>
                   ))}
                 </View>
-              ) : (
+              ) : emojiTab === 'stickers' ? (
                 <View style={styles.stickerPanel}>
                   {STICKER_PACKS.map((pack) => (
                     <View key={pack.id}>
@@ -722,6 +764,41 @@ export default function ChatScreen({ navigation, route }: any) {
                       </View>
                     </View>
                   ))}
+                </View>
+              ) : (
+                <View style={styles.gifPanel}>
+                  <View style={styles.gifSearchBar}>
+                    <Ionicons name="search" size={16} color={colors.textTertiary} />
+                    <TextInput
+                      style={styles.gifSearchInput}
+                      value={gifQuery}
+                      onChangeText={setGifQuery}
+                      placeholder="Search GIFs (via Tenor)"
+                      placeholderTextColor={colors.textTertiary}
+                    />
+                    {gifQuery.length > 0 && (
+                      <Pressable hitSlop={8} onPress={() => setGifQuery('')}>
+                        <Ionicons name="close-circle" size={16} color={colors.textTertiary} />
+                      </Pressable>
+                    )}
+                  </View>
+                  {!gifsEnabled() ? (
+                    <Text style={styles.gifEmpty}>GIFs arrive in the next update ⚡</Text>
+                  ) : gifsLoading && gifs.length === 0 ? (
+                    <View style={styles.gifLoading}><ActivityIndicator color={colors.red} /></View>
+                  ) : gifs.length === 0 ? (
+                    <Text style={styles.gifEmpty}>No GIFs found — try another word</Text>
+                  ) : (
+                    <ScrollView style={{ maxHeight: 240 }} keyboardShouldPersistTaps="handled">
+                      <View style={styles.gifGrid}>
+                        {gifs.map((g) => (
+                          <PressableScale key={g.id} scaleTo={0.94} onPress={() => sendGif(g)}>
+                            <Image source={{ uri: g.preview }} style={styles.gifThumb} resizeMode="cover" />
+                          </PressableScale>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  )}
                 </View>
               )}
             </Animated.View>
@@ -1255,6 +1332,26 @@ const styles = StyleSheet.create({
   stickerItem: { fontSize: 34 },
   stickerMsg: { marginVertical: 2, maxWidth: '78%' },
   stickerBig: { fontSize: 72, lineHeight: 84 },
+  // GIF picker panel
+  gifPanel: { paddingHorizontal: 12, paddingVertical: 8, gap: 8, maxHeight: 300 },
+  gifSearchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.glass, borderWidth: 1, borderColor: colors.glassBorder,
+    borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8,
+  },
+  gifSearchInput: { flex: 1, color: colors.white, fontSize: 13.5, fontFamily: fonts.regular, padding: 0 },
+  gifEmpty: { color: colors.textTertiary, fontSize: 12.5, fontFamily: fonts.regular, textAlign: 'center', paddingVertical: 28 },
+  gifLoading: { paddingVertical: 34, alignItems: 'center' },
+  gifGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'space-between' },
+  gifThumb: { width: 108, height: 108, borderRadius: 10, backgroundColor: colors.glass },
+  // GIF message
+  gifMsg: { marginVertical: 2, maxWidth: '70%' },
+  gifImage: { width: 200, height: 200, borderRadius: 16, backgroundColor: colors.glass },
+  gifTag: {
+    position: 'absolute', top: 8, left: 8,
+    backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  gifTagText: { color: colors.white, fontSize: 9.5, fontFamily: fonts.bold, letterSpacing: 0.5 },
   pickerTitle: {
     color: colors.white, fontSize: 16, fontFamily: fonts.semiBold,
     marginBottom: 10, paddingHorizontal: 14, paddingTop: 4,

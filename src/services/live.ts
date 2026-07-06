@@ -262,8 +262,27 @@ export async function inlineMediaContent(
 const CONTACT_MARK = '⟦bzc⟧';
 const POLL_MARK = '⟦bzp⟧';
 const STICKER_MARK = '⟦bzs⟧';
+const GIF_MARK = '⟦bzg⟧';
 
 export const stickerContent = (emoji: string) => `${STICKER_MARK}${emoji}`;
+export const gifContent = (url: string) => `${GIF_MARK}${url}`;
+
+// Chat-list preview label: turns a raw marker (or already-parsed text) into a
+// friendly one-liner. Covers optimistic local sends that still carry the marker.
+export function previewLabel(text: string): string {
+  if (!text) return '';
+  if (text.startsWith(STICKER_MARK)) return `${text.slice(STICKER_MARK.length)} Sticker`;
+  if (text.startsWith(GIF_MARK)) return 'GIF';
+  if (text.startsWith(IMG_MARK)) return '📷 Photo';
+  if (text.startsWith(AUDIO_MARK)) return '🎙️ Voice note';
+  if (text.startsWith(CONTACT_MARK)) {
+    try { return `👤 ${JSON.parse(text.slice(CONTACT_MARK.length)).name ?? 'Contact'}`; } catch { return '👤 Contact'; }
+  }
+  if (text.startsWith(POLL_MARK)) {
+    try { return `📊 ${JSON.parse(text.slice(POLL_MARK.length)).q ?? 'Poll'}`; } catch { return '📊 Poll'; }
+  }
+  return text;
+}
 
 // Build marker contents for schema-free rich messages (same trick as inline media)
 export const contactCardContent = (c: { id: string; name: string; username: string }) =>
@@ -279,18 +298,21 @@ export function messageExtras(m: {
   contactCard?: { id: string; name: string; username: string };
   poll?: { q: string; options: string[] };
   sticker?: string;
+  gifUrl?: string;
 }): {
   contactCard?: { id: string; name: string; username: string };
   poll?: { q: string; options: string[] };
   sticker?: string;
+  gifUrl?: string;
 } {
-  if (m.contactCard || m.poll || m.sticker) {
-    return { contactCard: m.contactCard, poll: m.poll, sticker: m.sticker };
+  if (m.contactCard || m.poll || m.sticker || m.gifUrl) {
+    return { contactCard: m.contactCard, poll: m.poll, sticker: m.sticker, gifUrl: m.gifUrl };
   }
   try {
     if (m.text?.startsWith(CONTACT_MARK)) return { contactCard: JSON.parse(m.text.slice(CONTACT_MARK.length)) };
     if (m.text?.startsWith(POLL_MARK)) return { poll: JSON.parse(m.text.slice(POLL_MARK.length)) };
     if (m.text?.startsWith(STICKER_MARK)) return { sticker: m.text.slice(STICKER_MARK.length) };
+    if (m.text?.startsWith(GIF_MARK)) return { gifUrl: m.text.slice(GIF_MARK.length) };
   } catch {}
   return {};
 }
@@ -300,6 +322,7 @@ function parseInline(content: string): {
   contactCard?: { id: string; name: string; username: string };
   poll?: { q: string; options: string[] };
   sticker?: string;
+  gifUrl?: string;
 } {
   if (content?.startsWith(AUDIO_MARK)) {
     const end = content.indexOf('⟧');
@@ -331,6 +354,9 @@ function parseInline(content: string): {
       const s = content.slice(STICKER_MARK.length);
       return { text: `${s} Sticker`, sticker: s };
     }
+    if (content?.startsWith(GIF_MARK)) {
+      return { text: 'GIF', gifUrl: content.slice(GIF_MARK.length) };
+    }
   } catch {}
   return { text: content };
 }
@@ -355,6 +381,7 @@ function toMessage(m: any, uid: string): Message {
     contactCard: inline.contactCard,
     poll: inline.poll,
     sticker: inline.sticker,
+    gifUrl: inline.gifUrl,
   };
 }
 
