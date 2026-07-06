@@ -59,7 +59,7 @@ export default function PhoneScreen({ navigation, route }: any) {
       <GlowBackground />
       <View style={styles.body}>
         <Animated.View entering={FadeInDown.duration(500)}>
-          <PressableScale onPress={() => navigation.goBack()} style={styles.back} haptic={false}>
+          <PressableScale onPress={() => navigation.goBack()} style={styles.back}>
             <Ionicons name="chevron-back" size={22} color={colors.white} />
           </PressableScale>
         </Animated.View>

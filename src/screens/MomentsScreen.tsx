@@ -51,7 +51,7 @@ export default function MomentsScreen({ navigation }: any) {
             <PressableScale
               onPress={() => navigation.navigate('MomentComposer')}
               style={styles.myEmpty}
-              haptic={false}
+
             >
               <Avatar gradient={profile.avatarGradient} label={profile.avatarEmoji} size={52} />
               <View style={{ flex: 1, marginLeft: 13 }}>
@@ -66,7 +66,7 @@ export default function MomentsScreen({ navigation }: any) {
                 key={m.id}
                 onPress={() => navigation.navigate('MomentViewer', { authorId: 'me' })}
                 style={styles.momentCard}
-                haptic={false}
+
               >
                 <LinearGradient
                   colors={m.gradient}
@@ -102,7 +102,7 @@ export default function MomentsScreen({ navigation }: any) {
                 <PressableScale
                   onPress={() => navigation.navigate('MomentViewer', { authorId: m.authorId })}
                   style={styles.momentCard}
-                  haptic={false}
+
                 >
                   <LinearGradient
                     colors={seen ? ([colors.border, colors.border] as const) : gradients.momentRing}

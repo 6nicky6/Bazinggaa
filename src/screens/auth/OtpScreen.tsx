@@ -78,7 +78,7 @@ export default function OtpScreen({ navigation, route }: any) {
     <View style={styles.container}>
       <GlowBackground />
       <View style={styles.body}>
-        <PressableScale onPress={() => navigation.goBack()} style={styles.back} haptic={false}>
+        <PressableScale onPress={() => navigation.goBack()} style={styles.back}>
           <Ionicons name="chevron-back" size={22} color={colors.white} />
         </PressableScale>
 
@@ -140,7 +140,6 @@ export default function OtpScreen({ navigation, route }: any) {
         )}
 
         <PressableScale
-          haptic={false}
           style={styles.resend}
           disabled={resendIn > 0}
           onPress={async () => {

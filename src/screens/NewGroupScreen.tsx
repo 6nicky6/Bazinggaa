@@ -50,7 +50,7 @@ export default function NewGroupScreen({ navigation, route }: any) {
     <View style={styles.container}>
       <GlowBackground />
       <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-        <PressableScale onPress={() => navigation.goBack()} haptic={false} style={styles.backBtn}>
+        <PressableScale onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.white} />
         </PressableScale>
         <Text style={styles.title}>{kind === 'channel' ? 'New Channel' : 'New Group'}</Text>
@@ -98,7 +98,7 @@ export default function NewGroupScreen({ navigation, route }: any) {
         renderItem={({ item }) => {
           const on = selected.includes(item.id);
           return (
-            <PressableScale haptic={false} style={styles.row} onPress={() => toggle(item.id)}>
+            <PressableScale style={styles.row} onPress={() => toggle(item.id)}>
               <Avatar gradient={item.gradient} label={item.initials} size={46} />
               <Text style={styles.name}>{item.name}</Text>
               <Ionicons

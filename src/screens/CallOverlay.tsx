@@ -11,6 +11,7 @@ import Avatar from '../components/Avatar';
 import { colors, gradients } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { useAppStore } from '../store/appStore';
+import { startRingtone, stopRingtone } from '../services/sounds';
 
 // Full-screen call UI (signaling mechanism live; voice/video streams arrive
 // with the dev-client build — the banner below says so honestly).
@@ -25,6 +26,14 @@ export default function CallOverlay() {
   useEffect(() => {
     pulse.value = withRepeat(withTiming(1, { duration: 1400, easing: Easing.out(Easing.quad) }), -1);
   }, []);
+
+  // Ring while a call is ringing (incoming = loud invite, outgoing = ringback);
+  // stop the moment it connects, ends, or the overlay unmounts.
+  useEffect(() => {
+    if (call?.status === 'ringing') startRingtone();
+    else stopRingtone();
+    return () => stopRingtone();
+  }, [call?.status]);
   useEffect(() => {
     if (call?.status !== 'accepted') return;
     setElapsed(0);

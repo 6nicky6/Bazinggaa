@@ -20,6 +20,7 @@ export type Message = {
   deleted?: boolean; // deleted for everyone
   forwarded?: boolean;
   starred?: boolean; // local bookmark (WhatsApp-style star)
+  missedCall?: boolean; // renders as a centered "missed call" pill
 };
 
 export type Contact = {
@@ -46,6 +47,7 @@ export type Chat = {
   pinned?: boolean;
   muted?: boolean;
   wallpaper?: number; // index into avatarGradients for a subtle chat backdrop
+  createdAt?: number; // when this chat first appeared on THIS device (fresh chats sort to top)
 };
 
 export type CallState = {

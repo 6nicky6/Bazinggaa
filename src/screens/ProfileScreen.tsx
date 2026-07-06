@@ -39,7 +39,6 @@ export default function ProfileScreen({ navigation }: any) {
         {/* identity */}
         <Animated.View entering={FadeInDown.duration(500)} style={styles.identity}>
           <PressableScale
-            haptic={false}
             onPress={async () => {
               try {
                 const ImagePicker = require('expo-image-picker');
@@ -68,7 +67,6 @@ export default function ProfileScreen({ navigation }: any) {
           <Text style={styles.username}>@{profile.username || 'you'} · {profile.phone}</Text>
           <Text style={styles.statusText}>{profile.statusText}</Text>
           <PressableScale
-            haptic={false}
             style={styles.editBtn}
             onPress={() => {
               setName(profile.name);
@@ -100,7 +98,7 @@ export default function ProfileScreen({ navigation }: any) {
         <Animated.View entering={FadeInDown.delay(130).duration(450)}>
           <Text style={styles.section}>MESSAGES</Text>
           <View style={styles.card}>
-            <PressableScale haptic={false} onPress={() => setStarredOpen(true)}>
+            <PressableScale onPress={() => setStarredOpen(true)}>
               <Row icon="star" label="Starred messages" sub={`${starredMsgs.length} starred`}>
                 <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
               </Row>
@@ -112,7 +110,7 @@ export default function ProfileScreen({ navigation }: any) {
         <Animated.View entering={FadeInDown.delay(145).duration(450)}>
           <Text style={styles.section}>BAZINGGA+</Text>
           <View style={styles.card}>
-            <PressableScale haptic={false} onPress={() => navigation.navigate('BazinggaPlus')}>
+            <PressableScale onPress={() => navigation.navigate('BazinggaPlus')}>
               <Row icon="flash" label="Bazingga+" sub="Premium themes, unlimited AI & more — coming at launch">
                 <Ionicons name="chevron-forward" size={17} color={colors.yellow} />
               </Row>
@@ -124,7 +122,7 @@ export default function ProfileScreen({ navigation }: any) {
         <Animated.View entering={FadeInDown.delay(160).duration(450)}>
           <Text style={styles.section}>PRIVACY & SAFETY</Text>
           <View style={styles.card}>
-            <PressableScale haptic={false} onPress={() => setBlockedOpen(true)}>
+            <PressableScale onPress={() => setBlockedOpen(true)}>
               <Row icon="hand-left" label="Blocked users" sub={`${blocked.length} blocked`}>
                 <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
               </Row>
@@ -153,7 +151,7 @@ export default function ProfileScreen({ navigation }: any) {
               sub={backendMode === 'live' ? 'Supabase (live)' : 'Demo mode — add keys in .env for live'}
             />
             <View style={styles.divider} />
-            <PressableScale haptic={false} onPress={() => navigation.navigate('PrivacyPolicy')}>
+            <PressableScale onPress={() => navigation.navigate('PrivacyPolicy')}>
               <Row icon="document-text" label="Privacy Policy & Terms" sub="How your data is handled">
                 <Ionicons name="chevron-forward" size={17} color={colors.textTertiary} />
               </Row>
@@ -195,7 +193,7 @@ export default function ProfileScreen({ navigation }: any) {
               maxLength={80}
             />
             <View style={styles.modalRow}>
-              <PressableScale haptic={false} style={styles.modalBtn} onPress={() => setEditOpen(false)}>
+              <PressableScale style={styles.modalBtn} onPress={() => setEditOpen(false)}>
                 <Text style={styles.modalBtnText}>Cancel</Text>
               </PressableScale>
               <PressableScale
@@ -237,7 +235,7 @@ export default function ProfileScreen({ navigation }: any) {
                 );
               })}
             </ScrollView>
-            <PressableScale haptic={false} style={[styles.modalBtn, { marginTop: 12 }]} onPress={() => setStarredOpen(false)}>
+            <PressableScale style={[styles.modalBtn, { marginTop: 12 }]} onPress={() => setStarredOpen(false)}>
               <Text style={styles.modalBtnText}>Close</Text>
             </PressableScale>
           </Animated.View>
@@ -258,13 +256,13 @@ export default function ProfileScreen({ navigation }: any) {
                 <View key={id} style={styles.blockedRow}>
                   <Avatar gradient={c.gradient} label={c.initials} size={40} />
                   <Text style={styles.blockedName}>{c.name}</Text>
-                  <PressableScale haptic={false} style={styles.unblockBtn} onPress={() => unblock(id)}>
+                  <PressableScale style={styles.unblockBtn} onPress={() => unblock(id)}>
                     <Text style={styles.unblockText}>Unblock</Text>
                   </PressableScale>
                 </View>
               );
             })}
-            <PressableScale haptic={false} style={[styles.modalBtn, { marginTop: 12 }]} onPress={() => setBlockedOpen(false)}>
+            <PressableScale style={[styles.modalBtn, { marginTop: 12 }]} onPress={() => setBlockedOpen(false)}>
               <Text style={styles.modalBtnText}>Close</Text>
             </PressableScale>
           </Animated.View>

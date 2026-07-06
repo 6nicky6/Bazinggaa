@@ -236,6 +236,16 @@ export default function ChatScreen({ navigation, route }: any) {
   };
   const moodTint = chat?.wallpaper === undefined ? MOOD_TINTS[mood] : null;
 
+  // AI Mood Engine, made visible: emoji + label so the feature isn't invisible
+  const MOOD_META: Record<ChatMood, { emoji: string; label: string } | null> = {
+    happy: { emoji: '😄', label: 'Happy vibe' },
+    calm: { emoji: '😌', label: 'Calm vibe' },
+    romantic: { emoji: '💗', label: 'Romantic vibe' },
+    serious: { emoji: '🧠', label: 'Serious tone' },
+    neutral: null,
+  };
+  const moodMeta = smartOn ? MOOD_META[mood] : null;
+
   const runSummarize = async () => {
     setMenuOpen(false);
     setSummarizing(true);
@@ -341,12 +351,17 @@ export default function ChatScreen({ navigation, route }: any) {
 
       {/* Header */}
       <Animated.View entering={FadeIn.duration(300)} style={styles.header}>
-        <PressableScale onPress={() => navigation.goBack()} haptic={false} style={styles.headerBtn}>
+        <PressableScale onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.white} />
         </PressableScale>
         <Avatar gradient={display.gradient} label={display.initials} size={40} online={display.online} imageUri={contact?.avatarUrl} />
         <View style={{ flex: 1, marginLeft: 11 }}>
-          <Text style={styles.headerName}>{display.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <Text style={styles.headerName} numberOfLines={1}>{display.name}</Text>
+            {moodMeta && (
+              <Text style={styles.moodChip}>{moodMeta.emoji}</Text>
+            )}
+          </View>
           <Text style={[styles.headerStatus, typing && { color: colors.yellow }]}>
             {isGroup
               ? chat?.kind === 'channel'
@@ -367,13 +382,13 @@ export default function ChatScreen({ navigation, route }: any) {
         </View>
         {!isGroup && contact && (
           <>
-            <PressableScale haptic={false} style={styles.headerBtn} onPress={() => startCall(contact.id, true)}>
+            <PressableScale style={styles.headerBtn} onPress={() => startCall(contact.id, true)}>
               <Ionicons name="videocam-outline" size={22} color={colors.textSecondary} />
             </PressableScale>
-            <PressableScale haptic={false} style={styles.headerBtn} onPress={() => startCall(contact.id, false)}>
+            <PressableScale style={styles.headerBtn} onPress={() => startCall(contact.id, false)}>
               <Ionicons name="call-outline" size={20} color={colors.textSecondary} />
             </PressableScale>
-            <PressableScale haptic={false} style={styles.headerBtn} onPress={() => setMenuOpen(true)}>
+            <PressableScale style={styles.headerBtn} onPress={() => setMenuOpen(true)}>
               <Ionicons name="ellipsis-vertical" size={18} color={colors.textSecondary} />
             </PressableScale>
           </>
@@ -397,6 +412,15 @@ export default function ChatScreen({ navigation, route }: any) {
             );
           }
           const m = item.msg;
+          if (m.missedCall) {
+            return (
+              <View style={styles.missedCallPill}>
+                <Ionicons name="call" size={13} color={colors.red} style={{ transform: [{ rotate: '135deg' }] }} />
+                <Text style={styles.missedCallText}>{m.text}</Text>
+                <Text style={styles.missedCallTime}>{timeStr(m.sentAt)}</Text>
+              </View>
+            );
+          }
           const mine = m.senderId === 'me';
           const quoted = m.replyToId ? messages.find((x) => x.id === m.replyToId) : undefined;
           const quotedName = quoted
@@ -463,7 +487,7 @@ export default function ChatScreen({ navigation, route }: any) {
               {(Object.entries(m.reactions) as [string, string[]][]).map(([emoji, ids]) => (
                 <PressableScale
                   key={emoji}
-                  haptic={false}
+
                   scaleTo={0.85}
                   onPress={() => reactToMessage(m.id, emoji)}
                   style={[styles.reactionChip, ids.includes('me') && styles.reactionChipMine]}
@@ -528,7 +552,7 @@ export default function ChatScreen({ navigation, route }: any) {
               {replyTo.imageUri ? '📷 Photo' : replyTo.text}
             </Text>
           </View>
-          <PressableScale haptic={false} onPress={() => setReplyTo(null)} style={styles.replyClose}>
+          <PressableScale onPress={() => setReplyTo(null)} style={styles.replyClose}>
             <Ionicons name="close" size={18} color={colors.textSecondary} />
           </PressableScale>
         </Animated.View>
@@ -558,7 +582,7 @@ export default function ChatScreen({ navigation, route }: any) {
           </View>
         ) : (
           <View style={styles.inputBar}>
-            <PressableScale haptic={false} style={styles.inputIcon} onPress={() => setAttachOpen(true)}>
+            <PressableScale style={styles.inputIcon} onPress={() => setAttachOpen(true)}>
               <Ionicons name="add" size={24} color={colors.textSecondary} />
             </PressableScale>
             {recording ? (
@@ -637,10 +661,9 @@ export default function ChatScreen({ navigation, route }: any) {
       {/* Chat menu: block / report (1:1 chats) */}
       {contact && (
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <PressableScale haptic={false} style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
+        <PressableScale style={styles.menuBackdrop} onPress={() => setMenuOpen(false)}>
           <Animated.View entering={ZoomIn.duration(180)} style={styles.menu}>
             <PressableScale
-              haptic={false}
               style={styles.menuItem}
               onPress={() => {
                 toggleMute(chatId);
@@ -655,16 +678,22 @@ export default function ChatScreen({ navigation, route }: any) {
               />
               <Text style={styles.menuText}>{chat?.muted ? 'Unmute' : 'Mute'}</Text>
             </PressableScale>
-            <PressableScale haptic={false} style={styles.menuItem} onPress={runSummarize}>
+            <PressableScale style={styles.menuItem} onPress={runSummarize}>
               <Ionicons name="sparkles-outline" size={18} color={colors.yellow} />
               <Text style={styles.menuText}>Summarize chat ✨</Text>
             </PressableScale>
+            {moodMeta && (
+              <View style={styles.menuItem}>
+                <Text style={{ fontSize: 16 }}>{moodMeta.emoji}</Text>
+                <Text style={[styles.menuText, { color: colors.textSecondary }]}>Mood: {moodMeta.label}</Text>
+              </View>
+            )}
             {(['close', 'family'] as const).map((circle) => {
               const inCircle = circles[circle].includes(contact.id);
               return (
                 <PressableScale
                   key={circle}
-                  haptic={false}
+
                   style={styles.menuItem}
                   onPress={() => {
                     toggleCircle(contact.id, circle);
@@ -694,7 +723,7 @@ export default function ChatScreen({ navigation, route }: any) {
                 {avatarGradients.slice(0, 5).map((g, i) => (
                   <PressableScale
                     key={i}
-                    haptic={false}
+
                     scaleTo={0.8}
                     onPress={() => { setWallpaper(chatId, chat?.wallpaper === i ? undefined : i); setMenuOpen(false); }}
                   >
@@ -707,7 +736,6 @@ export default function ChatScreen({ navigation, route }: any) {
               </View>
             </View>
             <PressableScale
-              haptic={false}
               style={styles.menuItem}
               onPress={() => {
                 block(contact.id);
@@ -718,7 +746,6 @@ export default function ChatScreen({ navigation, route }: any) {
               <Text style={[styles.menuText, { color: colors.red }]}>Block {contact.name}</Text>
             </PressableScale>
             <PressableScale
-              haptic={false}
               style={styles.menuItem}
               onPress={async () => {
                 setMenuOpen(false);
@@ -813,7 +840,6 @@ export default function ChatScreen({ navigation, route }: any) {
                     })();
                 return (
                   <PressableScale
-                    haptic={false}
                     style={styles.forwardRow}
                     onPress={() => {
                       if (forwardMsg) forwardMessage(forwardMsg.id, item.id);
@@ -848,7 +874,7 @@ export default function ChatScreen({ navigation, route }: any) {
                 renderItem={({ item }) => <Text style={styles.summaryText}>{item}</Text>}
               />
             )}
-            <PressableScale haptic={false} style={styles.summaryClose} onPress={() => setAiSummary(null)}>
+            <PressableScale style={styles.summaryClose} onPress={() => setAiSummary(null)}>
               <Text style={{ color: colors.textSecondary, fontFamily: fonts.semiBold, fontSize: 14 }}>Close</Text>
             </PressableScale>
           </Animated.View>
@@ -867,7 +893,7 @@ export default function ChatScreen({ navigation, route }: any) {
 
 function SheetItem({ icon, label, onPress, danger }: { icon: any; label: string; onPress: () => void; danger?: boolean }) {
   return (
-    <PressableScale haptic={false} style={styles.sheetItem} onPress={onPress}>
+    <PressableScale style={styles.sheetItem} onPress={onPress}>
       <Ionicons name={icon} size={19} color={danger ? colors.red : colors.textSecondary} />
       <Text style={[styles.sheetItemText, danger && { color: colors.red }]}>{label}</Text>
     </PressableScale>
@@ -883,7 +909,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(11,11,11,0.85)',
   },
   headerBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  headerName: { color: colors.white, fontSize: 16.5, fontFamily: fonts.semiBold },
+  headerName: { color: colors.white, fontSize: 16.5, fontFamily: fonts.semiBold, flexShrink: 1 },
+  moodChip: { fontSize: 13 },
+  missedCallPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 7, alignSelf: 'center',
+    backgroundColor: 'rgba(225,6,0,0.1)', borderWidth: 1, borderColor: 'rgba(225,6,0,0.25)',
+    borderRadius: 14, paddingHorizontal: 12, paddingVertical: 6, marginVertical: 6,
+  },
+  missedCallText: { color: colors.white, fontSize: 12.5, fontFamily: fonts.medium },
+  missedCallTime: { color: colors.textTertiary, fontSize: 11, fontFamily: fonts.regular },
   headerStatus: { color: colors.textSecondary, fontSize: 12, fontFamily: fonts.regular, marginTop: 1 },
   dayPill: {
     alignSelf: 'center', backgroundColor: colors.glass,

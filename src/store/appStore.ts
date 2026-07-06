@@ -22,6 +22,34 @@ const SAVED_CONTACT: Contact = {
 // chats that live entirely on-device (never synced, never wiped by reloads)
 const isLocalChatId = (id: string) =>
   id === BOT_ID || id === SAVED_ID || id.startsWith('official-');
+
+// Self-heal: BazinggaBot + Saved Messages must ALWAYS exist. If a user deletes
+// one via the chat-row menu, re-create it on the next load so it never vanishes.
+function withEssentialChats(chats: Chat[]): Chat[] {
+  const out = [...chats];
+  if (!out.some((c) => c.id === BOT_ID)) out.unshift({ id: BOT_ID, contactId: BOT_ID });
+  if (!out.some((c) => c.id === SAVED_ID)) out.push({ id: SAVED_ID, contactId: SAVED_ID });
+  return out;
+}
+
+// Drop a "missed call" line into the DM thread (only missed calls get logged in-chat).
+function addMissedCallMessage(
+  st: { chats: Chat[]; messages: Message[] },
+  call: { id: string; contactId: string; video: boolean }
+): Message[] {
+  const chat = st.chats.find((c) => c.contactId === call.contactId);
+  if (!chat) return st.messages;
+  const msg: Message = {
+    id: `missed-${call.id}`,
+    chatId: chat.id,
+    senderId: call.contactId, // renders as an incoming bubble
+    text: call.video ? '📹 Missed video call' : '📞 Missed voice call',
+    sentAt: Date.now(),
+    status: 'read',
+    missedCall: true,
+  };
+  return [...st.messages, msg];
+}
 import { OfficialChannel } from '../data/discover';
 import { notifyMessage } from '../services/notifications';
 import { playReceive, playSend, setSoundsEnabled } from '../services/sounds';
@@ -543,10 +571,10 @@ export const useAppStore = create<State>()(
         if (isLive) {
           const chatId = await live.ensureDirectChat(contactId);
           if (!chatId) return null;
-          set((st) => ({ chats: [{ id: chatId, contactId }, ...st.chats] }));
+          set((st) => ({ chats: [{ id: chatId, contactId, createdAt: Date.now() }, ...st.chats] }));
           return chatId;
         }
-        const chat: Chat = { id: contactId, contactId };
+        const chat: Chat = { id: contactId, contactId, createdAt: Date.now() };
         set((st) => ({ chats: [chat, ...st.chats] }));
         return chat.id;
       },
@@ -557,7 +585,7 @@ export const useAppStore = create<State>()(
           if (!id) return null;
           set((st) => ({
             chats: [
-              { id, contactId: '', kind, name, iconEmoji: icon, memberIds: [...memberIds, 'me'], myRole: 'owner' as const },
+              { id, contactId: '', kind, name, iconEmoji: icon, memberIds: [...memberIds, 'me'], myRole: 'owner' as const, createdAt: Date.now() },
               ...st.chats,
             ],
           }));
@@ -605,7 +633,7 @@ export const useAppStore = create<State>()(
             ...st.contacts.filter((c) => c.id !== id),
           ],
           chats: [
-            { id, contactId: id, kind: 'channel' as const, name: ch.name, iconEmoji: ch.emoji, myRole: 'member' as const },
+            { id, contactId: id, kind: 'channel' as const, name: ch.name, iconEmoji: ch.emoji, myRole: 'member' as const, createdAt: Date.now() },
             ...st.chats,
           ],
           messages: [...st.messages, ...seeded],
@@ -637,10 +665,10 @@ export const useAppStore = create<State>()(
         if (data) {
           set((st) => ({
             contacts: [BOT_CONTACT, SAVED_CONTACT, ...data.contacts],
-            chats: [
+            chats: withEssentialChats([
               ...st.chats.filter((c) => isLocalChatId(c.id)),
               ...data.chats,
-            ],
+            ]),
             // server messages + local bot history (bot is client-side)
             messages: [
               ...data.messages,
@@ -678,10 +706,10 @@ export const useAppStore = create<State>()(
                   if (!d) return;
                   set((s2) => ({
                     contacts: [BOT_CONTACT, SAVED_CONTACT, ...d.contacts],
-                    chats: [
+                    chats: withEssentialChats([
                       ...s2.chats.filter((c) => isLocalChatId(c.id)),
                       ...d.chats,
-                    ],
+                    ]),
                     messages: [
                       ...d.messages,
                       ...s2.messages.filter((x) => isLocalChatId(x.chatId)),
@@ -761,7 +789,7 @@ export const useAppStore = create<State>()(
             });
             return {
               contacts: [BOT_CONTACT, SAVED_CONTACT, ...d.contacts],
-              chats: [...s2.chats.filter((c) => isLocalChatId(c.id)), ...d.chats],
+              chats: withEssentialChats([...s2.chats.filter((c) => isLocalChatId(c.id)), ...d.chats]),
               messages: merged,
               moments: d.moments,
               blocked: d.blocked,
@@ -890,6 +918,7 @@ export const useAppStore = create<State>()(
                 },
                 ...st.calls,
               ],
+          messages: accept ? st.messages : addMissedCallMessage(st, call),
         }));
       },
 
@@ -907,6 +936,8 @@ export const useAppStore = create<State>()(
             },
             ...st.calls,
           ],
+          // only MISSED calls leave a trace in the chat (per Nikhil's ask)
+          messages: final === 'missed' ? addMissedCallMessage(st, call) : st.messages,
         }));
       },
 

@@ -58,7 +58,7 @@ export default function CallsScreen() {
                     </Text>
                   </View>
                 </View>
-                <PressableScale haptic={false} style={styles.callBtn} onPress={() => startCall(contact.id, item.video)}>
+                <PressableScale style={styles.callBtn} onPress={() => startCall(contact.id, item.video)}>
                   <Ionicons name={item.video ? 'videocam' : 'call'} size={20} color={colors.yellow} />
                 </PressableScale>
               </View>

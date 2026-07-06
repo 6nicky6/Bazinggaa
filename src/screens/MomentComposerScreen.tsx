@@ -36,7 +36,7 @@ export default function MomentComposerScreen({ navigation }: any) {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <LinearGradient colors={grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.container}>
         <Animated.View entering={FadeInDown.duration(400)} style={styles.topBar}>
-          <PressableScale onPress={() => navigation.goBack()} haptic={false} style={styles.topBtn}>
+          <PressableScale onPress={() => navigation.goBack()} style={styles.topBtn}>
             <Ionicons name="close" size={24} color={colors.white} />
           </PressableScale>
           <Text style={styles.topTitle}>New Moment</Text>
@@ -61,7 +61,7 @@ export default function MomentComposerScreen({ navigation }: any) {
             {AUDIENCES.map((a) => (
               <PressableScale
                 key={a.key}
-                haptic={false}
+
                 scaleTo={0.92}
                 style={[styles.audiencePill, audience === a.key && styles.audiencePillActive]}
                 onPress={() => setAudience(a.key)}

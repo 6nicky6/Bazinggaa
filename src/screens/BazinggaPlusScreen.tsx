@@ -25,7 +25,7 @@ export default function BazinggaPlusScreen({ navigation }: any) {
       <GlowBackground />
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-          <PressableScale onPress={() => navigation.goBack()} haptic={false} style={styles.backBtn}>
+          <PressableScale onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={22} color={colors.white} />
           </PressableScale>
         </Animated.View>

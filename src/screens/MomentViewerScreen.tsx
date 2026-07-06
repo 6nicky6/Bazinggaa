@@ -96,7 +96,6 @@ export default function MomentViewerScreen({ navigation, route }: any) {
           </View>
           {isMe && (
             <PressableScale
-              haptic={false}
               style={styles.headerBtn}
               onPress={() => {
                 deleteMoment(moment.id);
@@ -107,7 +106,7 @@ export default function MomentViewerScreen({ navigation, route }: any) {
               <Ionicons name="trash-outline" size={20} color={colors.white} />
             </PressableScale>
           )}
-          <PressableScale haptic={false} style={styles.headerBtn} onPress={() => navigation.goBack()}>
+          <PressableScale style={styles.headerBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="close" size={24} color={colors.white} />
           </PressableScale>
         </View>

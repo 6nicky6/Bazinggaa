@@ -52,7 +52,7 @@ export default function ContactsScreen({ navigation }: any) {
     <View style={styles.container}>
       <GlowBackground />
       <Animated.View entering={FadeInDown.duration(400)} style={styles.header}>
-        <PressableScale onPress={() => navigation.goBack()} haptic={false} style={styles.backBtn}>
+        <PressableScale onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.white} />
         </PressableScale>
         <Text style={styles.title}>New Chat</Text>
@@ -71,11 +71,11 @@ export default function ContactsScreen({ navigation }: any) {
       </Animated.View>
 
       <View style={styles.quickRow}>
-        <PressableScale haptic={false} style={styles.quickBtn} onPress={() => navigation.navigate('NewGroup', { kind: 'group' })}>
+        <PressableScale style={styles.quickBtn} onPress={() => navigation.navigate('NewGroup', { kind: 'group' })}>
           <Ionicons name="people" size={18} color={colors.yellow} />
           <Text style={styles.quickText}>New Group</Text>
         </PressableScale>
-        <PressableScale haptic={false} style={styles.quickBtn} onPress={() => navigation.navigate('NewGroup', { kind: 'channel' })}>
+        <PressableScale style={styles.quickBtn} onPress={() => navigation.navigate('NewGroup', { kind: 'channel' })}>
           <Ionicons name="megaphone" size={17} color={colors.yellow} />
           <Text style={styles.quickText}>New Channel</Text>
         </PressableScale>
@@ -83,7 +83,6 @@ export default function ContactsScreen({ navigation }: any) {
 
       {/* Invite friends — WhatsApp-style share via SMS/WhatsApp/anything */}
       <PressableScale
-        haptic={false}
         style={styles.inviteRow}
         onPress={() =>
           Share.share({
@@ -117,7 +116,6 @@ export default function ContactsScreen({ navigation }: any) {
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInDown.delay(120 + index * 50).duration(400)}>
             <PressableScale
-              haptic={false}
               style={styles.row}
               onPress={async () => {
                 const chatId = await ensureChat(item.id);

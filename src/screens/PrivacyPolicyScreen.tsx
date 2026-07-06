@@ -38,7 +38,7 @@ export default function PrivacyPolicyScreen({ navigation }: any) {
     <View style={styles.container}>
       <GlowBackground />
       <View style={styles.header}>
-        <PressableScale onPress={() => navigation.goBack()} haptic={false} style={styles.backBtn}>
+        <PressableScale onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={colors.white} />
         </PressableScale>
         <Text style={styles.title}>Privacy Policy</Text>

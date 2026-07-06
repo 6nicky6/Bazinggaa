@@ -34,3 +34,24 @@ function play(key: Key) {
 export const playSend = () => play('send');
 export const playReceive = () => play('receive');
 export const playRecord = () => play('record');
+
+// Ringtone: loops while an incoming call is ringing. Separate from the toggle —
+// a call should ring even if message sounds are off.
+let ringtone: AudioPlayer | null = null;
+export function startRingtone() {
+  try {
+    if (!ringtone) {
+      ringtone = createAudioPlayer(require('../../assets/sounds/ringtone.wav'));
+      ringtone.volume = 0.8;
+      ringtone.loop = true;
+    }
+    ringtone.seekTo(0);
+    ringtone.play();
+  } catch {}
+}
+export function stopRingtone() {
+  try {
+    ringtone?.pause();
+    ringtone?.seekTo(0);
+  } catch {}
+}

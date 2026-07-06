@@ -77,7 +77,11 @@ export default function ChatListScreen({ navigation }: any) {
       })
       .sort((a, b) => {
         if (!!a.chat.pinned !== !!b.chat.pinned) return a.chat.pinned ? -1 : 1;
-        return (b.last?.sentAt ?? 0) - (a.last?.sentAt ?? 0);
+        // rank by most recent activity; a freshly created chat with no messages
+        // falls back to its creation time so it lands at the TOP (WhatsApp-style),
+        // not the bottom
+        const rank = (r: typeof a) => r.last?.sentAt ?? r.chat.createdAt ?? 0;
+        return rank(b) - rank(a);
       });
     return out;
   }, [chats, contacts, messages, blocked, filter, search, lastReadAt]);
@@ -104,7 +108,7 @@ export default function ChatListScreen({ navigation }: any) {
         <View style={styles.headerIcons}>
           <PressableScale
             style={styles.iconButton}
-            haptic={false}
+
             onPress={() => navigation.navigate('Contacts')}
           >
             <Ionicons name="create-outline" size={19} color={colors.textSecondary} />
@@ -118,7 +122,7 @@ export default function ChatListScreen({ navigation }: any) {
           <Animated.View entering={FadeInRight.delay(100).springify()}>
             <PressableScale
               style={styles.momentItem}
-              haptic={false}
+
               onPress={() =>
                 myLive
                   ? navigation.navigate('MomentViewer', { authorId: 'me' })
@@ -147,7 +151,7 @@ export default function ChatListScreen({ navigation }: any) {
             <Animated.View key={m.contact.id} entering={FadeInRight.delay(150 + i * 70).springify()}>
               <PressableScale
                 style={styles.momentItem}
-                haptic={false}
+
                 onPress={() => navigation.navigate('MomentViewer', { authorId: m.contact.id })}
               >
                 <LinearGradient
@@ -215,7 +219,7 @@ export default function ChatListScreen({ navigation }: any) {
             <PressableScale
               style={styles.row}
               scaleTo={0.98}
-              haptic={false}
+
               onPress={() => navigation.navigate('Chat', { chatId: item.chat.id })}
               onLongPress={() => setRowMenu(item.chat.id)}
               delayLongPress={320}
@@ -266,15 +270,15 @@ export default function ChatListScreen({ navigation }: any) {
       <Modal visible={!!rowMenu} transparent animationType="fade" onRequestClose={() => setRowMenu(null)}>
         <Pressable style={styles.rowMenuBackdrop} onPress={() => setRowMenu(null)}>
           <Animated.View entering={FadeInDown.duration(180)} style={styles.rowMenu}>
-            <PressableScale haptic={false} style={styles.rowMenuItem} onPress={() => { if (rowMenu) togglePin(rowMenu); setRowMenu(null); }}>
+            <PressableScale style={styles.rowMenuItem} onPress={() => { if (rowMenu) togglePin(rowMenu); setRowMenu(null); }}>
               <Ionicons name={menuChat?.pinned ? 'pin' : 'pin-outline'} size={18} color={colors.yellow} />
               <Text style={styles.rowMenuText}>{menuChat?.pinned ? 'Unpin' : 'Pin to top'}</Text>
             </PressableScale>
-            <PressableScale haptic={false} style={styles.rowMenuItem} onPress={() => { if (rowMenu) toggleMute(rowMenu); setRowMenu(null); }}>
+            <PressableScale style={styles.rowMenuItem} onPress={() => { if (rowMenu) toggleMute(rowMenu); setRowMenu(null); }}>
               <Ionicons name={menuChat?.muted ? 'notifications-outline' : 'notifications-off-outline'} size={18} color={colors.textSecondary} />
               <Text style={styles.rowMenuText}>{menuChat?.muted ? 'Unmute' : 'Mute'}</Text>
             </PressableScale>
-            <PressableScale haptic={false} style={styles.rowMenuItem} onPress={() => { if (rowMenu) deleteChat(rowMenu); setRowMenu(null); }}>
+            <PressableScale style={styles.rowMenuItem} onPress={() => { if (rowMenu) deleteChat(rowMenu); setRowMenu(null); }}>
               <Ionicons name="trash-outline" size={18} color={colors.red} />
               <Text style={[styles.rowMenuText, { color: colors.red }]}>Delete chat</Text>
             </PressableScale>

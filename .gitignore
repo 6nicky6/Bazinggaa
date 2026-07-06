@@ -47,3 +47,7 @@ yarn-error.*
 .test-accounts.json
 
 .qa-session-*.json
+
+.qa-rig-sessions.json
+
+.qa-rig-inject.json

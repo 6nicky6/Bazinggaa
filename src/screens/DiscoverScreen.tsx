@@ -86,7 +86,6 @@ function ChannelsTab({ navigation }: any) {
           return (
             <Animated.View entering={FadeInDown.delay(60 + index * 60).duration(400)}>
               <PressableScale
-                haptic={false}
                 style={styles.channelRow}
                 onPress={() => {
                   const id = joinChannel(item);
@@ -103,7 +102,6 @@ function ChannelsTab({ navigation }: any) {
                   <Text style={styles.channelMeta}>{item.subscribers} subscribers</Text>
                 </View>
                 <PressableScale
-                  haptic={false}
                   onPress={() => {
                     const id = joinChannel(item);
                     navigation.navigate('Chat', { chatId: id });
@@ -192,7 +190,6 @@ function PeopleTab({ navigation }: any) {
         renderItem={({ item, index }) => (
           <Animated.View entering={FadeInDown.delay(60 + index * 50).duration(400)}>
             <PressableScale
-              haptic={false}
               style={styles.channelRow}
               onPress={async () => {
                 const chatId = await ensureChat(item.id);
