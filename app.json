@@ -19,7 +19,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.nicky.bazingga",
+      "package": "app.bazingga",
       "versionCode": 1,
       "permissions": [
         "android.permission.RECORD_AUDIO",

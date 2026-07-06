@@ -88,7 +88,7 @@ export default function ContactsScreen({ navigation }: any) {
         onPress={() =>
           Share.share({
             message:
-              "Join me on Bazingga — the new messenger with an AI sidekick ⚡ Fast. Private. Expressive.\n\nGet it here: https://github.com/6nicky6/Bazinggaa/releases (Play Store coming soon!)",
+              "Join me on Bazingga — the new messenger with an AI sidekick ⚡ Fast. Private. Expressive.\n\nComing soon to Google Play — bazingga.app",
           }).catch(() => {})
         }
       >

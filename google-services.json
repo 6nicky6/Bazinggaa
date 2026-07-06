@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:675353612570:android:c3d14ea6d9617d499ddca3",
+        "android_client_info": {
+          "package_name": "app.bazingga"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDlWjcxH4eZZKbm9jJJ35dHwkQ_7RvBMfs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:675353612570:android:17ed61e5cc9445289ddca3",
         "android_client_info": {
           "package_name": "com.nicky.bazingga"
