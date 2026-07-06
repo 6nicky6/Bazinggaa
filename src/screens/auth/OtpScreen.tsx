@@ -11,12 +11,9 @@ import { useAppStore } from '../../store/appStore';
 import { backendMode } from '../../services/supabase';
 import { fetchMyProfile, OtpTarget, sendOtp, verifyOtp } from '../../services/live';
 
-// 6-digit OTP. Demo mode: any 6 digits verify. Live mode: real SMS/email code.
-// Code length adapts to the channel: Supabase email currently sends 8 digits,
-// Twilio Verify SMS sends 6, demo mode accepts 6. (Email drops to 6 once the
-// server setting is updated — this screen follows whatever arrives.)
-const lenFor = (target: OtpTarget) =>
-  backendMode === 'live' && target.email ? 8 : 6;
+// 6-digit OTP everywhere: email (server set to 6 on 6 Jul 2026), Twilio SMS,
+// and demo mode all send 6 digits now.
+const lenFor = (_target: OtpTarget) => 6;
 
 export default function OtpScreen({ navigation, route }: any) {
   const target: OtpTarget = route.params?.target ?? { phone: route.params?.phone ?? '' };
