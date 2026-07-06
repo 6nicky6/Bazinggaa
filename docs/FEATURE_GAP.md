@@ -189,4 +189,25 @@ Also worth flagging (core in the vision, currently *deferred* by CLAUDE.md — a
 
 ---
 
-*Sources: `CLAUDE.md`, `docs/PROGRESS_LOG.md`, `docs/ROADMAP.md`, and a read-through of every screen in `src/screens/`, services in `src/services/`, and the store (`src/store/appStore.ts`) as of 5 Jul 2026.*
+## 🔄 Round-2 reconciliation (6 Jul 2026 — Nikhil re-sent the original brainstorm)
+
+New items surfaced that the first audit did NOT capture:
+
+| # | Feature (from the brainstorm) | Status | Call |
+|---|---|---|---|
+| 1 | **AI Clips** — auto "chat memories" mini-reels from photos/voice/texts + music | ❌ NEW | Phase 3+ (needs media pipeline first) |
+| 2 | **Dual Mode** — explicit 🧩 Social / 🔒 Private mode switch | ❌ NEW | Design concept; revisit when groups/channels are live |
+| 3 | **Invisible Entry** — join a group silently, lurk before engaging | ❌ NEW | Build with live groups (post schema-v3) |
+| 4 | **AI Privacy Guard** — AI flags risky shares/scams (family-safe angle) | ❌ NEW | Idea-stage; strong brand fit |
+| 5 | **Chat effects** — celebration animations (🎆 on "Congrats!" etc.) | ❌ NEW | Quick win — buildable now, OTA |
+| 6 | **Moments boosts** — paid visibility for Moments | ❌ NEW | Phase 4 monetization |
+
+Enhancements to existing features (captured, but the brainstorm asks for more):
+- **Smart Circles**: circles exist (manual); brainstorm wants AI to auto-group contacts → later AI pass.
+- **Companion AI**: BazinggaBot exists; brainstorm wants it to optionally reply to friends for you → later, needs careful UX.
+- **AI Avatars (lip-sync)**: captured idea-stage — ⚠️ conflicts with the later "NO AI-generated faces" brand rule. Needs Nikhil's decision; avatar = stylized/non-photoreal could satisfy both.
+- **Mood Engine**: built (subtle tint); brainstorm wants louder adaptation (emojis, tones, backgrounds) → optional intensity setting later.
+
+Superseded by later decisions (no action): early taglines ("Talk. Feel. Connect." etc.), sunset-orange/electric-blue palette (final brand: red/yellow/black, "Fast. Private. Expressive."), FlutterFlow/no-code build path (replaced by Claude Code + Expo + Supabase).
+
+*Sources: `CLAUDE.md`, `docs/PROGRESS_LOG.md`, `docs/ROADMAP.md`, and a read-through of every screen in `src/screens/`, services in `src/services/`, and the store (`src/store/appStore.ts`) as of 5 Jul 2026. Round-2 reconciliation added 6 Jul 2026.*
