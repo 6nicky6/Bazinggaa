@@ -1,5 +1,22 @@
 # Bazingga Progress Log
 
+### 2026-07-07 — 📋 APK #8 TEST FEEDBACK → POLISH BATCH (Nikhil's launch-readiness list) — NOT YET DONE
+Nikhil tested APK #8 on real device, sent WhatsApp screenshots as the design bar. Full spec to execute (design skills load FIRST):
+1. **PUSH + CALLS closed-app = DEAD (MAJOR).** Root cause CONFIRMED: push code correct (registerPushToken → devices table ✅, webhook→edge fn `push`→Expo verified ✅) but FCM V1 service-account key on Expo is linked to OLD package com.nicky.bazingga only; app.bazingga has NO FCM credential → Expo can't deliver to Google FCM → no closed-app push, no incoming-call wake. FIX (browser, no code): expo.dev → project bazingga → Credentials → Android → app.bazingga → "FCM V1 service account key" → upload the bazingga-e8cd2 Firebase service-account JSON (Firebase console → project settings → service accounts → generate key). Then rebuild. Calls-when-closed also depend on this (need a data/notification push to wake the app for incoming call).
+2. **UI density redesign to WhatsApp/Telegram** (attachments 1,2=WA compact; 3=our too-big list; 4=double input blob; 5=WA Updates page):
+   - 2.1 Chat-list rows TOO BIG/WIDE → densify: smaller avatar (~46-48), tighter vertical padding, smaller name/preview fonts, fit more per screen. Message bubbles TOO BIG → cut padding+font so a short msg is a tight small blob (WA-style). MOVE Moments story-circles OFF chat list (they're above the chat window now) INTO the Moments tab, WhatsApp-Updates style (Add-status header + recent-updates list). `src/screens/ChatListScreen.tsx` + `MomentsScreen.tsx`.
+   - 2.2 Chat-list search bar like WA ("Ask BazinggaBot or Search") with BazinggaBot access from the bar.
+   - 2.3 Archive chats (swipe/long-press → archive; Archived row pinned at top like WA). Needs a `archived` flag on chat + store action.
+   - 2.4 Input composer shows 2 nested blobs (double-bezel shell + inner pill) → REMOVE inner, keep ONE clean pill like WA. `ChatScreen.tsx` inputShell.
+   - 2.5 Emoji panel → full PAGED emoji keyboard w/ category tabs + many more emojis (WA/Telegram-grade), not just quick-strip.
+   - 2.6 Sounds are basic/generic → replace with UNIQUE standout tones: record-start, in-call ringtone, message-receive, send. (Source richer royalty-free or synth better than current wavs in assets/sounds/.)
+   - 2.7 Bottom tab bar fully see-through while scrolling (content shows through) → keep translucent BUT add a fade/scrim gradient so content fades under it, bar stays legible. `navigation/index.tsx` FrostedTabBar.
+   - 2.8 (= 2.1) chat rows smaller/denser.
+   - 2.9 NO haptic on bottom-tab button presses → add Haptics.selectionAsync on tab press.
+3. **STRATEGIC: real voice/video calls BEFORE launch.** Currently signaling-only (ring/accept via Supabase realtime, no stream). Plan = react-native-webrtc (free OSS) + `@config-plugins/react-native-webrtc` (works w/ our EAS builds) + Supabase realtime for signaling (already have) + STUN (free, Google) + TURN (needed ~20-30% of calls behind strict NAT). Cost options: self-host coturn on ~$5/mo VPS (cheapest, scales), OR LiveKit Cloud / Daily.co free tier (10k min/mo free, zero-ops), OR Agora (10k free min/mo). Recommend LiveKit or Daily free tier to start (zero infra), migrate to self-host if volume grows. Build = ~1-2 focused sessions + native build. Low cost early (free tiers), scales with minutes at volume.
+
+Reminder: test next APK on the local Android emulator (C:\Android AVD bazingga_pixel, on-demand). Then Nikhil's phones.
+
 ### 2026-07-07 — 🎬 GIFs LIVE + ✅ APK #8 built (GIFs baked in)
 - Did: Giphy dev account (Bazinggapp, bazingga.app@gmail — email+pw, no Google SSO on Giphy) → API key created via his Chrome → tested (trending + search return real GIFs, pg-13 rating). Wired EXPO_PUBLIC_GIPHY_API_KEY into .env + EAS preview env. GIF service was already provider-agnostic (gifs.ts reads Giphy OR Tenor). OTA b53f96b8 published (GIFs live on APK#7 already installed). APK #8 built: https://expo.dev/artifacts/eas/rJEXU5xpqHSn9f9_9hDEF8-HG5bM7HIy-X9H2pjkbWY.apk (build a9201da6, package app.bazingga, GIFs native). Fixed placeholder "via Tenor"→"Search GIFs".
 - Broke: Nothing (tsc clean). Giphy beta key = 100 calls/hr (fine for test; free upgrade before public launch). Tenor abandoned (GCP org policy + broken enable page).
