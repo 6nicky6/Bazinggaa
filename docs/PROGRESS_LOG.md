@@ -1,5 +1,10 @@
 # Bazingga Progress Log
 
+### 2026-07-07 — 🎬 GIFs LIVE + ✅ APK #8 built (GIFs baked in)
+- Did: Giphy dev account (Bazinggapp, bazingga.app@gmail — email+pw, no Google SSO on Giphy) → API key created via his Chrome → tested (trending + search return real GIFs, pg-13 rating). Wired EXPO_PUBLIC_GIPHY_API_KEY into .env + EAS preview env. GIF service was already provider-agnostic (gifs.ts reads Giphy OR Tenor). OTA b53f96b8 published (GIFs live on APK#7 already installed). APK #8 built: https://expo.dev/artifacts/eas/rJEXU5xpqHSn9f9_9hDEF8-HG5bM7HIy-X9H2pjkbWY.apk (build a9201da6, package app.bazingga, GIFs native). Fixed placeholder "via Tenor"→"Search GIFs".
+- Broke: Nothing (tsc clean). Giphy beta key = 100 calls/hr (fine for test; free upgrade before public launch). Tenor abandoned (GCP org policy + broken enable page).
+- Next: Nikhil clean-installs APK#8 → tests GIFs/polls/contacts/stickers/photo-Moments → polish notes. Then FCM push re-link for app.bazingga (browser), Play Store prep, remove nightly-sweep at launch.
+
 ### 2026-07-07 — ✅ APK #7 BUILT (app.bazingga) — Nikhil's test build
 - APK #7 download: https://expo.dev/artifacts/eas/uImGgsHKSuUEAsCJmSAM8RkBwTnQGw-8oBuv16-bhXc.apk (build eea6e279, commit f15856a, package app.bazingga, new keystore, preview/OTA channel). Installs as a SEPARATE app (new package) — delete old com.nicky.bazingga after confirming. Fixes the fresh-install 6-digit OTP login block; all wave-3 features native (composer redesign, polls, contact cards, stickers, photo Moments, Zing teaser, GIF tab pending key).
 - Pending after test: Giphy/Tenor key (OTA lights up GIFs), FCM push re-link for app.bazingga (browser), then 2-user real-device test → Play Store internal track.
