@@ -773,7 +773,7 @@ export default function ChatScreen({ navigation, route }: any) {
                       style={styles.gifSearchInput}
                       value={gifQuery}
                       onChangeText={setGifQuery}
-                      placeholder="Search GIFs (via Tenor)"
+                      placeholder="Search GIFs"
                       placeholderTextColor={colors.textTertiary}
                     />
                     {gifQuery.length > 0 && (
